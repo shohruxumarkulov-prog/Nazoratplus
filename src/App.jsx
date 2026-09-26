@@ -227,32 +227,32 @@ const FONT_SCALES = [
 
 const PALETTES = {
   dark: {
-    "--bg-app": "#181c22",
-    "--bg-card": "#181c22",
+    "--bg-app": "#12151a",
+    "--bg-card": "#1a1e25",
     "--bg-panel": "#181c22",
-    "--border": "#242a32",
-    "--border-input": "#333b45",
-    "--border-soft": "#1c2129",
+    "--border": "#262b33",
+    "--border-input": "#333944",
+    "--border-soft": "#20242b",
     "--text-primary": "#edeff2",
-    "--text-secondary": "#8d97a3",
-    "--text-muted": "#69727e",
-    "--text-faint": "#5b6470",
-    "--shadow-hi": "rgba(255,255,255,0.035)",
-    "--shadow-lo": "rgba(0,0,0,0.5)",
+    "--text-secondary": "#9aa3af",
+    "--text-muted": "#6b7280",
+    "--text-faint": "#4d5560",
+    "--shadow-card": "0 1px 2px rgba(0,0,0,0.35), 0 4px 10px rgba(0,0,0,0.25)",
+    "--shadow-pop": "0 12px 32px rgba(0,0,0,0.45)",
   },
   light: {
-    "--bg-app": "#e8e8e8",
-    "--bg-card": "#e8e8e8",
-    "--bg-panel": "#e8e8e8",
-    "--border": "#e0e3e8",
-    "--border-input": "#c5cbd4",
-    "--border-soft": "#e9ecf0",
-    "--text-primary": "#3f3f3f",
-    "--text-secondary": "#6a6a6a",
-    "--text-muted": "#8a8a8a",
-    "--text-faint": "#9a9a9a",
-    "--shadow-hi": "rgba(255,255,255,0.95)",
-    "--shadow-lo": "rgba(163,169,184,0.55)",
+    "--bg-app": "#f4f5f7",
+    "--bg-card": "#ffffff",
+    "--bg-panel": "#ffffff",
+    "--border": "#e7e9ed",
+    "--border-input": "#d7dbe1",
+    "--border-soft": "#edeef1",
+    "--text-primary": "#1d2229",
+    "--text-secondary": "#5c6472",
+    "--text-muted": "#889099",
+    "--text-faint": "#a7adb6",
+    "--shadow-card": "0 1px 2px rgba(16,24,40,0.04), 0 2px 8px rgba(16,24,40,0.06)",
+    "--shadow-pop": "0 16px 40px rgba(16,24,40,0.14)",
   },
 };
 
@@ -360,7 +360,7 @@ function Field({ label, value, onChange, type = "text" }) {
           type={isPassword ? (reveal ? "text" : "password") : type}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className={`w-full px-3 py-2.5 ${isPassword ? "pr-10" : ""} rounded-lg bg-[var(--bg-app)] neu-inset border border-transparent text-[var(--text-primary)] text-sm outline-none focus:border-[var(--accent)] transition-colors`}
+          className={`w-full px-3 py-2.5 ${isPassword ? "pr-10" : ""} rounded-lg field text-[var(--text-primary)] text-sm outline-none focus:border-[var(--accent)] transition-colors`}
         />
         {isPassword && (
           <button
@@ -453,7 +453,7 @@ function MoneyField({ label, value, onChange, suffix }) {
           value={display}
           onChange={(e) => onChange(e.target.value.replace(/\D/g, ""))}
           placeholder="0"
-          className={`w-full px-3 py-2.5 ${suffix ? "pr-14" : ""} rounded-lg bg-[var(--bg-app)] neu-inset border border-transparent text-[var(--text-primary)] text-sm font-mono tabular-nums outline-none focus:border-[var(--accent)] transition-colors`}
+          className={`w-full px-3 py-2.5 ${suffix ? "pr-14" : ""} rounded-lg field text-[var(--text-primary)] text-sm font-mono tabular-nums outline-none focus:border-[var(--accent)] transition-colors`}
         />
         {suffix && (
           <span className="absolute right-3 top-0 h-full flex items-center text-[var(--text-muted)] text-xs">{suffix}</span>
@@ -463,20 +463,25 @@ function MoneyField({ label, value, onChange, suffix }) {
   );
 }
 
-function Stat({ label, value, tone = "default", icon }) {
+// YANGI: bir nechta statistikani alohida-alohida kartochkalarga o'rash o'rniga,
+// bitta umumiy kartochka ichida chiziqlar bilan ajratilgan katakchalarga
+// joylashtiradi — ekranda "kartochkalar to'lib ketishi"ning oldini oladi.
+function StatCell({ label, value, tone = "default", icon, border = "" }) {
   const toneMap = {
     default: "text-[var(--text-primary)]",
     good: "text-[var(--good)]",
     bad: "text-[var(--bad)]",
   };
-  const valueLength = String(value).length;
-  const sizeClass = valueLength > 13 ? "text-xs" : valueLength > 10 ? "text-sm" : valueLength > 8 ? "text-base" : "text-lg";
+  const borderClass = [
+    border.includes("r") ? "border-r" : "",
+    border.includes("b") ? "border-b" : "",
+  ].filter(Boolean).join(" ");
   return (
-    <div className="bg-[var(--bg-card)] neu-raised rounded-xl p-4 min-w-0 overflow-hidden">
+    <div className={`p-4 min-w-0 overflow-hidden ${borderClass} border-[var(--border-soft)]`}>
       <div className="flex items-center gap-1.5 text-[var(--text-muted)] text-[11px] mb-1.5 leading-snug">
         {icon}<span>{label}</span>
       </div>
-      <div className={`${sizeClass} font-semibold font-mono tabular-nums leading-tight whitespace-nowrap ${toneMap[tone]}`}>{value}</div>
+      <div className={`text-base font-semibold font-mono tabular-nums leading-tight whitespace-nowrap truncate ${toneMap[tone]}`}>{value}</div>
     </div>
   );
 }
@@ -526,7 +531,7 @@ function Shell({ title, userName, avatar, onTitleClick, bottomNav, headerRight, 
 function TelegramPromptModal({ phase, onLink, onSkip, busy }) {
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[60] flex items-center justify-center px-6">
-      <div className="w-full max-w-sm bg-[var(--bg-panel)] neu-raised rounded-2xl p-6 text-center">
+      <div className="w-full max-w-sm bg-[var(--bg-panel)] card rounded-2xl p-6 text-center">
         {phase === "success" ? (
           <>
             <div
@@ -736,7 +741,7 @@ function UsernameCheckField({ value, onChange, onStatusChange, active }) {
   );
 }
 
-function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister, loginBusy }) {
+function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister, loginBusy, rememberMe, setRememberMe }) {
   const [showPassword, setShowPassword] = useState(false);
   const [registering, setRegistering] = useState(false);
   const [regStep, setRegStep] = useState("username"); // "username" | "password"
@@ -745,7 +750,6 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
   const [regError, setRegError] = useState("");
   const [regBusy, setRegBusy] = useState(false);
   const [showRegPassword, setShowRegPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(true);
   const [showForgotHint, setShowForgotHint] = useState(false);
   const [forgotMode, setForgotMode] = useState(null); // null | 'choose' | 'employee' | 'admin'
   const [btnHover, setBtnHover] = useState(false);
@@ -1020,7 +1024,7 @@ function CopyButton({ text }) {
     <button
       type="button"
       onClick={doCopy}
-      className="flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--bg-app)] neu-inset text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-[11px] transition-colors shrink-0"
+      className="flex items-center gap-1 px-2 py-1 rounded-md field text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-[11px] transition-colors shrink-0"
     >
       {copied ? <Check size={12} className="text-[var(--good)]" /> : <Copy size={12} />}
       {copied ? t("copied") : t("copy")}
@@ -1079,7 +1083,7 @@ function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage, onResetPassword 
   }
 
   return (
-    <div className="bg-[var(--bg-card)] neu-raised rounded-xl overflow-hidden">
+    <div className="card rounded-xl overflow-hidden">
       {showPhoto && <Lightbox src={emp.avatar} name={emp.name} onClose={() => setShowPhoto(false)} />}
       <div className="p-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
@@ -1117,19 +1121,15 @@ function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage, onResetPassword 
 
 
       {open && (
-        <div className="border-t border-[var(--border)] bg-[var(--bg-panel)] p-4 space-y-3">
-          <button type="button" onClick={() => setShowPhoto(true)} className="w-full flex flex-col items-center gap-2 pb-2">
+        <div className="border-t border-[var(--border)] p-4 space-y-1">
+          <button type="button" onClick={() => setShowPhoto(true)} className="w-full flex flex-col items-center gap-2 pb-3">
             <Avatar src={emp.avatar} name={emp.name} size={64} />
             <div className="text-[var(--text-primary)] text-sm font-semibold">{emp.name}</div>
           </button>
 
-          <div className="flex items-center gap-1.5 text-[var(--text-secondary)] text-xs font-medium mb-1">
-            <KeyRound size={12} /> {t("credentialsHeader")}
-          </div>
-
-          <div className="flex items-center justify-between gap-2 bg-[var(--bg-app)] neu-inset rounded-lg px-3 py-2">
+          <div className="flex items-center justify-between gap-2 py-2.5 border-b border-[var(--border-soft)]">
             <div className="min-w-0">
-              <div className="text-[10px] text-[var(--text-muted)]">{t("login")}</div>
+              <div className="flex items-center gap-1.5 text-[var(--text-muted)] text-[11px] mb-0.5"><KeyRound size={11} /> {t("login")}</div>
               <div className="text-[var(--text-primary)] text-sm truncate">{emp.username}</div>
             </div>
             <CopyButton text={emp.username} />
@@ -1139,55 +1139,55 @@ function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage, onResetPassword 
             <button
               type="button"
               onClick={() => { setResetOpen(true); setResetMsg(""); }}
-              className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-[var(--bg-app)] neu-inset text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors"
+              className="w-full flex items-center gap-1.5 py-2.5 border-b border-[var(--border-soft)] text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors"
             >
               <KeyRound size={13} /> Parolni tiklash
             </button>
           ) : (
-            <div className="bg-[var(--bg-app)] neu-inset rounded-lg p-3 space-y-2">
+            <div className="field rounded-lg p-3 space-y-2 my-2">
               <Field label="Yangi parol" type="password" value={resetPw} onChange={setResetPw} />
               {resetMsg && <p className="text-[var(--text-secondary)] text-xs">{resetMsg}</p>}
               <div className="flex gap-2">
                 <button type="button" onClick={submitReset} className="flex-1 py-2 rounded-lg text-[#12161c] text-xs font-semibold hover:opacity-90 transition-opacity" style={{ backgroundColor: accent }}>
                   {t("save")}
                 </button>
-                <button type="button" onClick={() => { setResetOpen(false); setResetPw(""); }} className="flex-1 py-2 rounded-lg bg-[var(--bg-app)] neu-inset text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors">
+                <button type="button" onClick={() => { setResetOpen(false); setResetPw(""); }} className="flex-1 py-2 rounded-lg field text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors">
                   {t("cancel")}
                 </button>
               </div>
             </div>
           )}
 
-          <div className="flex items-center gap-1.5 text-[var(--text-secondary)] text-xs font-medium mb-1 mt-1">
-            <Wallet size={12} /> {t("dailyWage")}
-          </div>
           {!editingWage ? (
-            <div className="flex items-center justify-between gap-2 bg-[var(--bg-app)] neu-inset rounded-lg px-3 py-2">
-              <div className="text-[var(--text-primary)] text-sm font-mono tabular-nums">{fmt(emp.dailyWage)}{t("perDay")}</div>
+            <div className="flex items-center justify-between gap-2 py-2.5 border-b border-[var(--border-soft)]">
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 text-[var(--text-muted)] text-[11px] mb-0.5"><Wallet size={11} /> {t("dailyWage")}</div>
+                <div className="text-[var(--text-primary)] text-sm font-mono tabular-nums">{fmt(emp.dailyWage)}{t("perDay")}</div>
+              </div>
               <button
                 type="button"
                 onClick={() => { setWageDraft(String(emp.dailyWage || "")); setEditingWage(true); }}
-                className="p-1.5 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                className="p-1.5 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors shrink-0"
                 aria-label={t("editWage")}
               >
                 <Settings size={14} />
               </button>
             </div>
           ) : (
-            <div className="bg-[var(--bg-app)] neu-inset rounded-lg p-3 space-y-2">
+            <div className="field rounded-lg p-3 space-y-2 my-2">
               <MoneyField label={t("newDailyWage")} value={wageDraft} onChange={setWageDraft} suffix="so'm" />
               <div className="flex gap-2">
                 <button type="button" onClick={saveWage} className="flex-1 py-2 rounded-lg text-[#12161c] text-xs font-semibold hover:opacity-90 transition-opacity" style={{ backgroundColor: accent }}>
                   {t("save")}
                 </button>
-                <button type="button" onClick={() => setEditingWage(false)} className="flex-1 py-2 rounded-lg bg-[var(--bg-app)] neu-inset text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors">
+                <button type="button" onClick={() => setEditingWage(false)} className="flex-1 py-2 rounded-lg field text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors">
                   {t("cancel")}
                 </button>
               </div>
             </div>
           )}
 
-          <div className="grid grid-cols-3 gap-2 pt-1">
+          <div className="grid grid-cols-3 gap-2 pt-3 pb-1">
             <div className="text-center">
               <div className="text-[var(--text-primary)] text-sm font-semibold font-mono tabular-nums">{fmtDays(s.workedDays)}</div>
               <div className="text-[9px] text-[var(--text-muted)] uppercase tracking-wide mt-0.5">{t("day")}</div>
@@ -1223,7 +1223,7 @@ function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage, onResetPassword 
                 <button type="button" onClick={onDelete} className="flex-1 py-2 rounded-lg bg-[var(--bad)] text-white text-xs font-semibold hover:opacity-90 transition-opacity">
                   {t("yesDelete")}
                 </button>
-                <button type="button" onClick={() => setConfirmDelete(false)} className="flex-1 py-2 rounded-lg bg-[var(--bg-app)] neu-inset text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors">
+                <button type="button" onClick={() => setConfirmDelete(false)} className="flex-1 py-2 rounded-lg field text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors">
                   {t("cancel")}
                 </button>
               </div>
@@ -1256,7 +1256,7 @@ function NotificationPanel({ open, onClose, notifications, onMarkAllRead }) {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30 transition-opacity" onClick={onClose} />
       )}
       <div
-        className={`fixed top-0 right-0 h-full w-[86%] max-w-sm bg-[var(--bg-panel)] neu-raised z-40 overflow-y-auto transition-transform duration-200 ${
+        className={`fixed top-0 right-0 h-full w-[86%] max-w-sm bg-[var(--bg-panel)] card z-40 overflow-y-auto transition-transform duration-200 ${
           open ? "translate-x-0" : "translate-x-full"
         }`}
       >
@@ -1288,7 +1288,7 @@ function NotificationPanel({ open, onClose, notifications, onMarkAllRead }) {
           {notifications.map((n) => (
             <div
               key={n.id}
-              className="bg-[var(--bg-card)] neu-raised rounded-xl p-3.5"
+              className="card rounded-xl p-3.5"
               style={!n.is_read ? { borderColor: "var(--accent)" } : undefined}
             >
               <div className="flex items-center justify-between gap-2 mb-1">
@@ -1400,7 +1400,7 @@ function ProfileDrawer({
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30 transition-opacity" onClick={onClose} />
       )}
       <div
-        className={`fixed top-0 left-0 h-full w-[86%] max-w-sm bg-[var(--bg-panel)] neu-raised z-40 overflow-y-auto transition-transform duration-200 ${
+        className={`fixed top-0 left-0 h-full w-[86%] max-w-sm bg-[var(--bg-panel)] card z-40 overflow-y-auto transition-transform duration-200 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -1629,7 +1629,7 @@ function ProfileDrawer({
                   <button
                     type="button"
                     onClick={() => { setConfirmDeleteAcc(false); setDeletePwInput(""); setDeletePwError(""); }}
-                    className="flex-1 py-2 rounded-lg bg-[var(--bg-app)] neu-inset text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors"
+                    className="flex-1 py-2 rounded-lg field text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors"
                   >
                     {t("cancel")}
                   </button>
@@ -1721,7 +1721,7 @@ function AdminApp({
 
   const bottomNav = (
     <nav className="fixed bottom-0 left-0 right-0 z-20 px-4" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 16px)" }}>
-      <div className="max-w-md mx-auto flex bg-[var(--bg-card)]/95 backdrop-blur-md neu-raised rounded-full px-1.5 py-1">
+      <div className="max-w-md mx-auto flex bg-[var(--bg-card)]/95 backdrop-blur-md border border-[var(--border)] shadow-[var(--shadow-card)] rounded-full px-1.5 py-1">
         {tabs.map((tab) => {
           const active = adminTab === tab.id;
           return (
@@ -1804,7 +1804,7 @@ function AdminApp({
               <UserPlus size={16} /> {t("addEmployeeHeader")}
             </button>
           ) : (
-            <div className="bg-[var(--bg-card)] neu-raised rounded-xl p-5">
+            <div className="card rounded-xl p-5">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-1.5 text-[var(--text-primary)] text-sm font-semibold">
                   <UserPlus size={15} /> {t("addEmployeeHeader")}
@@ -1840,7 +1840,7 @@ function AdminApp({
                 value={empSearch}
                 onChange={(e) => setEmpSearch(e.target.value)}
                 placeholder="Ism bo'yicha qidirish..."
-                className="w-full pl-9 pr-3 py-2.5 rounded-lg bg-[var(--bg-app)] neu-inset border border-transparent text-[var(--text-primary)] text-sm outline-none focus:border-[var(--accent)] transition-colors"
+                className="w-full pl-9 pr-3 py-2.5 rounded-lg field text-[var(--text-primary)] text-sm outline-none focus:border-[var(--accent)] transition-colors"
               />
             </div>
           )}
@@ -1873,7 +1873,7 @@ function AdminApp({
 
       {adminTab === "attendance" && (
         <div className="space-y-4">
-          <div className="bg-[var(--bg-card)] neu-raised rounded-xl p-4">
+          <div className="card rounded-xl p-4">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-1.5 text-[var(--text-primary)] text-sm font-semibold">
                 <Calendar size={15} /> {t("markAttendanceHeader")}
@@ -1883,7 +1883,7 @@ function AdminApp({
               <button
                 type="button"
                 onClick={() => setWeekOffset((w) => w - 1)}
-                className="shrink-0 w-7 h-14 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--bg-app)] neu-inset transition-colors"
+                className="shrink-0 w-7 h-14 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] field transition-colors"
                 aria-label="prev week"
               >
                 <ChevronLeft size={16} />
@@ -1937,7 +1937,7 @@ function AdminApp({
               <button
                 type="button"
                 onClick={() => setWeekOffset((w) => w + 1)}
-                className="shrink-0 w-7 h-14 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--bg-app)] neu-inset transition-colors"
+                className="shrink-0 w-7 h-14 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] field transition-colors"
                 aria-label="next week"
               >
                 <ChevronRight size={16} />
@@ -1998,7 +1998,7 @@ function AdminApp({
                     <button
                       type="button"
                       onClick={() => setPendingBulk(null)}
-                      className="px-3 py-1.5 rounded-md bg-[var(--bg-app)] neu-inset text-[var(--text-secondary)] text-[11px] font-medium"
+                      className="px-3 py-1.5 rounded-md field text-[var(--text-secondary)] text-[11px] font-medium"
                     >
                       {t("cancel")}
                     </button>
@@ -2013,7 +2013,7 @@ function AdminApp({
               <p className="text-[var(--text-muted)] text-sm text-center py-8">{t("noEmployees")}</p>
             )}
             {visibleEmployees.length > 0 && attDate > todayISO() && (
-              <p className="text-[var(--warn)] text-xs text-center py-2 bg-[var(--bg-card)] neu-raised rounded-lg">{t("futureDateWarning")}</p>
+              <p className="text-[var(--warn)] text-xs text-center py-2 card rounded-lg">{t("futureDateWarning")}</p>
             )}
             {visibleEmployees.map((emp) => {
               const hasEntry = attendance[emp.id]?.[attDate] !== undefined;
@@ -2042,7 +2042,7 @@ function AdminApp({
                   type="button"
                   disabled={isFuture}
                   onClick={cycleStatus}
-                  className="w-full bg-[var(--bg-card)] neu-raised rounded-xl p-3.5 flex items-center justify-between gap-3 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-left"
+                  className="w-full card rounded-xl p-3.5 flex items-center justify-between gap-3 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-left"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <Avatar src={emp.avatar} name={emp.name} size={32} />
@@ -2069,7 +2069,7 @@ function AdminApp({
 
       {adminTab === "advances" && (
         <div className="space-y-5">
-          <div className="bg-[var(--bg-card)] neu-raised rounded-xl p-5">
+          <div className="card rounded-xl p-5">
             <div className="flex items-center gap-1.5 text-[var(--text-primary)] text-sm font-semibold mb-4">
               <Wallet size={15} /> {t("giveAdvanceHeader")}
             </div>
@@ -2095,7 +2095,7 @@ function AdminApp({
               <div className="col-span-2">
                 <label className="block text-xs text-[var(--text-secondary)] mb-1.5">{t("employee")}</label>
                 <select value={advEmp} onChange={(e) => setAdvEmp(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-lg bg-[var(--bg-app)] neu-inset border border-transparent text-[var(--text-primary)] text-sm outline-none focus:border-[var(--accent)]">
+                  className="w-full px-3 py-2.5 rounded-lg field text-[var(--text-primary)] text-sm outline-none focus:border-[var(--accent)]">
                   <option value="">{t("selectPlaceholder")}</option>
                   {myEmployees.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
                 </select>
@@ -2112,7 +2112,7 @@ function AdminApp({
           </div>
 
           {advEmp && (
-            <div className="bg-[var(--bg-card)] neu-raised rounded-xl p-5">
+            <div className="card rounded-xl p-5">
               <div className="text-[var(--text-primary)] text-sm font-semibold mb-3">{t("advanceHistory")}</div>
               {(advances[advEmp] || []).length === 0 && <p className="text-[var(--text-muted)] text-xs">{t("noAdvances")}</p>}
               <div className="space-y-2">
@@ -2147,7 +2147,7 @@ function AdminApp({
               return sum + (r > 0 ? r : 0);
             }, 0);
             return (
-              <div className="bg-[var(--bg-card)] neu-raised rounded-xl p-6 text-center">
+              <div className="card rounded-xl p-6 text-center">
                 <div className="text-[var(--text-muted)] text-xs mb-1.5">Jami to'lash kerak</div>
                 <div className={`text-3xl font-bold font-mono tabular-nums ${totalOwed > 0 ? "text-[var(--bad)]" : "text-[var(--good)]"}`}>
                   {fmt(totalOwed)}
@@ -2155,7 +2155,7 @@ function AdminApp({
               </div>
             );
           })()}
-        <div className="bg-[var(--bg-card)] neu-raised rounded-xl overflow-hidden">
+        <div className="card rounded-xl overflow-hidden">
           <div className="p-5 pb-3 flex items-center justify-between gap-2">
             <div className="text-[var(--text-primary)] text-sm font-semibold flex items-center gap-1.5">
               <ClipboardList size={15} /> {t("reportHeader")}
@@ -2290,7 +2290,7 @@ function EmployeeApp({
   ];
   const empBottomNav = (
     <nav className="fixed bottom-0 left-0 right-0 z-20 px-4" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 16px)" }}>
-      <div className="max-w-md mx-auto flex bg-[var(--bg-card)]/95 backdrop-blur-md neu-raised rounded-full px-1.5 py-1">
+      <div className="max-w-md mx-auto flex bg-[var(--bg-card)]/95 backdrop-blur-md border border-[var(--border)] shadow-[var(--shadow-card)] rounded-full px-1.5 py-1">
         {empTabs.map((tab) => {
           const active = empTab === tab.id;
           return (
@@ -2341,7 +2341,7 @@ function EmployeeApp({
       >
         {empTab === "umumiy" && (
           <div className="tab-transition space-y-3">
-            <div className="bg-[var(--bg-card)] neu-raised rounded-xl p-6 text-center">
+            <div className="card rounded-xl p-6 text-center">
               <div className="flex items-center justify-center gap-1.5 text-[var(--text-muted)] text-xs mb-1.5">
                 <Wallet size={13} /> {t("statRemainingSalary")}
               </div>
@@ -2349,13 +2349,11 @@ function EmployeeApp({
                 {fmt(s.remaining)}
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-2 sm:gap-3">
-              <Stat label={t("statWorkedDays")} value={fmtDays(s.workedDays)} icon={<Calendar size={12} />} />
-              <Stat label={t("statDailyWage")} value={fmt(s.emp.dailyWage)} icon={<Wallet size={12} />} />
-            </div>
-            <div className="grid grid-cols-2 gap-2 sm:gap-3">
-              <Stat label={t("typeAvans")} value={fmt(s.totalAvans)} tone="bad" icon={<TrendingDown size={12} />} />
-              <Stat label={t("typeSalary")} value={fmt(s.totalSalaryPaid)} tone="bad" icon={<Wallet size={12} />} />
+            <div className="card rounded-xl overflow-hidden grid grid-cols-2">
+              <StatCell label={t("statWorkedDays")} value={fmtDays(s.workedDays)} icon={<Calendar size={12} />} border="r b" />
+              <StatCell label={t("statDailyWage")} value={fmt(s.emp.dailyWage)} icon={<Wallet size={12} />} border="b" />
+              <StatCell label={t("typeAvans")} value={fmt(s.totalAvans)} tone="bad" icon={<TrendingDown size={12} />} border="r" />
+              <StatCell label={t("typeSalary")} value={fmt(s.totalSalaryPaid)} tone="bad" icon={<Wallet size={12} />} />
             </div>
           </div>
         )}
@@ -2381,13 +2379,13 @@ function EmployeeApp({
 
           return (
             <div className="tab-transition space-y-3">
-              <div className="bg-[var(--bg-card)] neu-raised rounded-xl p-4">
+              <div className="card rounded-xl p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <button type="button" onClick={() => setAttMonthOffset((o) => o - 1)} className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--bg-app)] neu-inset">
+                  <button type="button" onClick={() => setAttMonthOffset((o) => o - 1)} className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] field">
                     <ChevronLeft size={15} />
                   </button>
                   <span className="text-[var(--text-primary)] text-sm font-semibold capitalize">{monthLabel}</span>
-                  <button type="button" onClick={() => setAttMonthOffset((o) => Math.min(0, o + 1))} disabled={attMonthOffset === 0} className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--bg-app)] neu-inset disabled:opacity-30">
+                  <button type="button" onClick={() => setAttMonthOffset((o) => Math.min(0, o + 1))} disabled={attMonthOffset === 0} className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] field disabled:opacity-30">
                     <ChevronRight size={15} />
                   </button>
                 </div>
@@ -2418,9 +2416,9 @@ function EmployeeApp({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                <Stat label="Shu oy ishlagan" value={fmtDays(monthWorkedDays)} icon={<Calendar size={12} />} />
-                <Stat label="Shu oy hisoblangan" value={fmt(monthWage)} tone="good" icon={<Wallet size={12} />} />
+              <div className="card rounded-xl overflow-hidden grid grid-cols-2">
+                <StatCell label="Shu oy ishlagan" value={fmtDays(monthWorkedDays)} icon={<Calendar size={12} />} border="r" />
+                <StatCell label="Shu oy hisoblangan" value={fmt(monthWage)} tone="good" icon={<Wallet size={12} />} />
               </div>
             </div>
           );
@@ -2483,12 +2481,12 @@ function EmployeeApp({
               </div>
 
               {filteredAdv.length === 0 && (
-                <div className="bg-[var(--bg-card)] neu-raised rounded-xl p-8 text-center">
+                <div className="card rounded-xl p-8 text-center">
                   <p className="text-[var(--text-muted)] text-xs">{t("noAdvancesYet")}</p>
                 </div>
               )}
               {filteredAdv.slice().reverse().map((a) => (
-                <div key={a.id} className="bg-[var(--bg-card)] neu-raised rounded-xl p-2.5 flex items-center gap-2.5">
+                <div key={a.id} className="card rounded-xl p-2.5 flex items-center gap-2.5">
                   <div
                     className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
                     style={a.type === "salary" ? { backgroundColor: "var(--good-soft)", color: "var(--good)" } : { backgroundColor: "var(--warn-soft)", color: "var(--warn)" }}
@@ -2542,7 +2540,20 @@ function WorkforceAppInner() {
     setCurrentUserState(user);
   }
 
-  const [loginForm, setLoginForm] = useState({ username: "", password: "" });
+  // YANGI: "Meni eslab qol" endi haqiqatan ishlaydi — belgilangan bo'lsa,
+  // loginni (parolni EMAS) brauzerda saqlab qo'yamiz va keyingi safar
+  // kirish ekrani avtomatik to'ldirib beradi.
+  const [rememberMe, setRememberMe] = useState(() => {
+    try { return localStorage.getItem("nazorat_remember_me") !== "0"; } catch (e) { return true; }
+  });
+  const [loginForm, setLoginForm] = useState(() => {
+    try {
+      const savedUsername = localStorage.getItem("nazorat_remembered_username") || "";
+      return { username: savedUsername, password: "" };
+    } catch (e) {
+      return { username: "", password: "" };
+    }
+  });
   const [loginError, setLoginError] = useState("");
   const [loginBusy, setLoginBusy] = useState(false);
 
@@ -2732,6 +2743,15 @@ function WorkforceAppInner() {
         setLoginBusy(false);
         return;
       }
+      try {
+        if (rememberMe) {
+          localStorage.setItem("nazorat_remembered_username", username);
+          localStorage.setItem("nazorat_remember_me", "1");
+        } else {
+          localStorage.removeItem("nazorat_remembered_username");
+          localStorage.setItem("nazorat_remember_me", "0");
+        }
+      } catch (e) {}
       setSession(signInData.session);
       await loadAllData(signInData.session.user);
     } catch (err) {
@@ -3063,6 +3083,8 @@ function WorkforceAppInner() {
         loginBusy={loginBusy}
         onSubmit={handleLogin}
         onRegister={registerAdmin}
+        rememberMe={rememberMe}
+        setRememberMe={setRememberMe}
       />
     );
   } else if (currentUser.role === "admin") {
@@ -3150,20 +3172,22 @@ function WorkforceAppInner() {
           }
           .tab-transition { animation: fadeSlideIn 0.28s ease-out; }
 
-          /* YANGI: butun ilova bo'ylab yumshoq (neumorphic) uslub — login
-             ekranidagi kabi. Barcha "kartochka"lar bir xil fonga ega bo'lib,
-             faqat yorug'/qorong'i soyalar orqali "ko'tarilgan" yoki
-             "botiq" ko'rinishga ega bo'ladi. */
-          .neu-raised {
-            box-shadow: -7px -7px 14px var(--shadow-hi), 7px 7px 14px var(--shadow-lo);
-            transition: box-shadow 0.2s ease, transform 0.2s ease;
+          /* YANGI: tekis (flat), zamonaviy uslub. Har bir "kartochka" nozik
+             border va bitta yumshoq soya bilan ajralib turadi — ikki tomonlama
+             neumorphic soyalar olib tashlandi, chunki ular qora fonda
+             notekis va xira ko'rinar edi. */
+          .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-card);
+            transition: border-color 0.15s ease, transform 0.15s ease;
           }
-          .neu-inset {
-            box-shadow: inset -4px -4px 8px var(--shadow-hi), inset 4px 4px 8px var(--shadow-lo);
+          .field {
+            background: var(--bg-app);
+            border: 1px solid var(--border-input);
           }
-          button.neu-raised:active {
-            box-shadow: inset -4px -4px 8px var(--shadow-hi), inset 4px 4px 8px var(--shadow-lo);
-            transform: translateY(1px);
+          button.card:active {
+            transform: scale(0.98);
           }
 
           button:focus-visible,
