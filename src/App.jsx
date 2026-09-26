@@ -26,6 +26,21 @@ const fmtDays = (n) => {
   return Number.isInteger(r) ? String(r) : r.toFixed(1);
 };
 
+// YANGI: asosiy tugmalar uchun accent rangidan yumshoq gradient hosil qiladi —
+// login ekranidagi gradient uslubi bilan uyg'unlik uchun.
+function darkenHex(hex, amount) {
+  const h = hex.replace("#", "");
+  const num = parseInt(h, 16);
+  const delta = Math.round(255 * amount);
+  const r = Math.max(0, (num >> 16) - delta);
+  const g = Math.max(0, ((num >> 8) & 0x00ff) - delta);
+  const b = Math.max(0, (num & 0x0000ff) - delta);
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")}`;
+}
+function accentGradient(hex) {
+  return `linear-gradient(155deg, ${hex} 0%, ${darkenHex(hex, 0.28)} 100%)`;
+}
+
 function wageForDate(emp, date) {
   const history = emp.wageHistory;
   if (!Array.isArray(history) || history.length === 0) return Number(emp.dailyWage || 0);
@@ -484,6 +499,63 @@ function StatCell({ label, value, tone = "default", icon, border = "" }) {
       <div className={`text-base font-semibold font-mono tabular-nums leading-tight whitespace-nowrap truncate ${toneMap[tone]}`}>{value}</div>
     </div>
   );
+}
+
+// YANGI: bo'sh holatlar uchun — shunchaki matn o'rniga ikonka + (kerak bo'lsa)
+// harakat tugmasi bilan, ekran "bo'sh" his qilinmasligi uchun.
+function EmptyState({ icon, text, actionLabel, onAction }) {
+  const { accent } = useApp();
+  return (
+    <div className="flex flex-col items-center justify-center gap-2.5 py-10 text-center">
+      <div className="w-11 h-11 rounded-full flex items-center justify-center bg-[var(--bg-app)] text-[var(--text-faint)]">
+        {icon}
+      </div>
+      <p className="text-[var(--text-muted)] text-sm">{text}</p>
+      {actionLabel && onAction && (
+        <button
+          type="button"
+          onClick={onAction}
+          className="mt-1 flex items-center gap-1.5 px-4 py-2 rounded-lg text-[#12161c] text-xs font-semibold hover:opacity-90 transition-opacity"
+          style={{ background: accentGradient(accent) }}
+        >
+          <Plus size={14} /> {actionLabel}
+        </button>
+      )}
+    </div>
+  );
+}
+
+// YANGI: pul summasi o'zgarganda eski qiymatdan yangi qiymatgacha animatsiyali
+// sanaydi — faqat 1-2 ta muhim joyda (umumiy qoldiq, jami qarz) ishlatiladi.
+function AnimatedAmount({ value, formatter, className }) {
+  const [display, setDisplay] = useState(value);
+  const prevRef = useRef(value);
+  const rafRef = useRef(null);
+
+  useEffect(() => {
+    const from = prevRef.current;
+    const to = value;
+    if (from === to) return;
+    const start = performance.now();
+    const duration = 650;
+    function tick(now) {
+      const progress = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplay(from + (to - from) * eased);
+      if (progress < 1) {
+        rafRef.current = requestAnimationFrame(tick);
+      } else {
+        prevRef.current = to;
+        setDisplay(to);
+      }
+    }
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(tick);
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  return <span className={className}>{formatter(Math.round(display))}</span>;
 }
 
 function Avatar({ src, name, size = 40 }) {
@@ -1148,7 +1220,7 @@ function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage, onResetPassword 
               <Field label="Yangi parol" type="password" value={resetPw} onChange={setResetPw} />
               {resetMsg && <p className="text-[var(--text-secondary)] text-xs">{resetMsg}</p>}
               <div className="flex gap-2">
-                <button type="button" onClick={submitReset} className="flex-1 py-2 rounded-lg text-[#12161c] text-xs font-semibold hover:opacity-90 transition-opacity" style={{ backgroundColor: accent }}>
+                <button type="button" onClick={submitReset} className="flex-1 py-2 rounded-lg text-[#12161c] text-xs font-semibold hover:opacity-90 transition-opacity" style={{ background: accentGradient(accent) }}>
                   {t("save")}
                 </button>
                 <button type="button" onClick={() => { setResetOpen(false); setResetPw(""); }} className="flex-1 py-2 rounded-lg field text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors">
@@ -1177,7 +1249,7 @@ function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage, onResetPassword 
             <div className="field rounded-lg p-3 space-y-2 my-2">
               <MoneyField label={t("newDailyWage")} value={wageDraft} onChange={setWageDraft} suffix="so'm" />
               <div className="flex gap-2">
-                <button type="button" onClick={saveWage} className="flex-1 py-2 rounded-lg text-[#12161c] text-xs font-semibold hover:opacity-90 transition-opacity" style={{ backgroundColor: accent }}>
+                <button type="button" onClick={saveWage} className="flex-1 py-2 rounded-lg text-[#12161c] text-xs font-semibold hover:opacity-90 transition-opacity" style={{ background: accentGradient(accent) }}>
                   {t("save")}
                 </button>
                 <button type="button" onClick={() => setEditingWage(false)} className="flex-1 py-2 rounded-lg field text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors">
@@ -1232,6 +1304,58 @@ function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage, onResetPassword 
         </div>
       )}
     </div>
+  );
+}
+
+// YANGI: davomat holatini bosganda rang darhol "qattiq" almashmasin deb,
+// qisqa "pop" (kattalashib-qaytish) animatsiyasi qo'shildi.
+function AttendanceStatusRow({ emp, status, isFuture, onCycle }) {
+  const { t } = useApp();
+  const [pulse, setPulse] = useState(false);
+  const pulseTimer = useRef(null);
+
+  useEffect(() => () => { if (pulseTimer.current) clearTimeout(pulseTimer.current); }, []);
+
+  function handleClick() {
+    if (isFuture) return;
+    onCycle();
+    setPulse(false);
+    requestAnimationFrame(() => {
+      setPulse(true);
+      if (pulseTimer.current) clearTimeout(pulseTimer.current);
+      pulseTimer.current = setTimeout(() => setPulse(false), 280);
+    });
+  }
+
+  const statusConfig = {
+    null: { label: t("statusNone"), icon: <Calendar size={15} />, bg: "var(--bg-app)", color: "var(--text-muted)", border: "1px solid var(--border-input)" },
+    1: { label: t("fullDay"), icon: <CheckCircle2 size={15} />, bg: "var(--good)", color: "#0e1712", border: "none" },
+    0.5: { label: t("halfDay"), icon: <Calendar size={15} />, bg: "var(--warn)", color: "#1a1608", border: "none" },
+    0: { label: t("absent"), icon: <XCircle size={15} />, bg: "var(--bad)", color: "#1c0e0c", border: "none" },
+  };
+  const cfg = statusConfig[status === null ? "null" : status];
+
+  return (
+    <button
+      type="button"
+      disabled={isFuture}
+      onClick={handleClick}
+      className="w-full card rounded-xl p-3.5 flex items-center justify-between gap-3 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-left"
+    >
+      <div className="flex items-center gap-2.5 min-w-0">
+        <Avatar src={emp.avatar} name={emp.name} size={32} />
+        <div className="min-w-0">
+          <div className="text-[var(--text-primary)] text-sm font-medium truncate">{emp.name}</div>
+          <div className="text-[var(--text-muted)] text-[11px]">{fmt(emp.dailyWage)}{t("perDay")}</div>
+        </div>
+      </div>
+      <span
+        className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold shrink-0 ${pulse ? "status-pop" : ""}`}
+        style={{ backgroundColor: cfg.bg, color: cfg.color, border: cfg.border }}
+      >
+        {cfg.icon} {cfg.label}
+      </span>
+    </button>
   );
 }
 
@@ -1561,7 +1685,7 @@ function ProfileDrawer({
               disabled={saveBusy}
               onClick={submitPassword}
               className="mt-3 w-full py-2.5 rounded-lg text-[#12161c] text-xs font-semibold hover:opacity-90 transition-opacity disabled:opacity-60"
-              style={{ backgroundColor: accent }}
+              style={{ background: accentGradient(accent) }}
             >
               {saveBusy ? t("loading") : t("save")}
             </button>
@@ -1795,6 +1919,26 @@ function AdminApp({
       <div key={adminTab} className="tab-transition" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
       {adminTab === "employees" && (
         <div className="space-y-5">
+          {myEmployees.length > 0 && (() => {
+            const todayMarked = myEmployees.filter((emp) => attendance[emp.id]?.[todayISO()] !== undefined).length;
+            if (todayMarked > 0) return null;
+            return (
+              <div className="flex items-center gap-2.5 rounded-lg p-3" style={{ backgroundColor: "var(--warn-soft)", border: "1px solid var(--warn)" }}>
+                <Bell size={16} style={{ color: "var(--warn)" }} className="shrink-0" />
+                <span className="text-xs font-medium flex-1" style={{ color: "var(--warn)" }}>
+                  Bugun hali hech kim uchun davomat belgilanmagan
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setAdminTab("attendance")}
+                  className="text-xs font-semibold shrink-0 hover:opacity-80 transition-opacity"
+                  style={{ color: "var(--warn)" }}
+                >
+                  Belgilash →
+                </button>
+              </div>
+            );
+          })()}
           {!showAddForm ? (
             <button
               type="button"
@@ -1825,7 +1969,7 @@ function AdminApp({
                 disabled={addBusy}
                 onClick={async () => { setAddBusy(true); const ok = await addEmployee(); setAddBusy(false); if (ok) setShowAddForm(false); }}
                 className="mt-4 flex items-center gap-1.5 px-4 py-2 rounded-lg text-[#12161c] text-xs font-semibold hover:opacity-90 transition-opacity disabled:opacity-60"
-                style={{ backgroundColor: accent }}
+                style={{ background: accentGradient(accent) }}
               >
                 <Plus size={14} /> {addBusy ? t("loading") : t("add")}
               </button>
@@ -1851,7 +1995,14 @@ function AdminApp({
                 emp.name.toLowerCase().includes(empSearch.trim().toLowerCase())
               );
               if (myEmployees.length === 0) {
-                return <p className="text-[var(--text-muted)] text-sm text-center py-8">{t("noEmployees")}</p>;
+                return (
+                  <EmptyState
+                    icon={<Users size={20} />}
+                    text={t("noEmployees")}
+                    actionLabel={t("add")}
+                    onAction={() => setShowAddForm(true)}
+                  />
+                );
               }
               if (filteredEmployees.length === 0) {
                 return <p className="text-[var(--text-muted)] text-sm text-center py-8">Hech kim topilmadi</p>;
@@ -2010,7 +2161,12 @@ function AdminApp({
 
           <div className="space-y-2">
             {visibleEmployees.length === 0 && (
-              <p className="text-[var(--text-muted)] text-sm text-center py-8">{t("noEmployees")}</p>
+              <EmptyState
+                icon={<Users size={20} />}
+                text={t("noEmployees")}
+                actionLabel={t("add")}
+                onAction={() => { setAdminTab("employees"); setShowAddForm(true); }}
+              />
             )}
             {visibleEmployees.length > 0 && attDate > todayISO() && (
               <p className="text-[var(--warn)] text-xs text-center py-2 card rounded-lg">{t("futureDateWarning")}</p>
@@ -2020,44 +2176,21 @@ function AdminApp({
               const st = hasEntry ? attEntryStatus(attendance[emp.id]?.[attDate]) : null;
               const isFuture = attDate > todayISO();
 
-              function cycleStatus() {
-                if (isFuture) return;
-                if (st === null) markAttendance(emp.id, 1);
-                else if (st === 1) markAttendance(emp.id, 0.5);
-                else if (st === 0.5) markAttendance(emp.id, 0);
-                else markAttendance(emp.id, 1);
+              function nextStatus() {
+                if (st === null) return 1;
+                if (st === 1) return 0.5;
+                if (st === 0.5) return 0;
+                return 1;
               }
 
-              const statusConfig = {
-                null: { label: t("statusNone"), icon: <Calendar size={15} />, bg: "var(--bg-app)", color: "var(--text-muted)", border: "1px solid var(--border-input)" },
-                1: { label: t("fullDay"), icon: <CheckCircle2 size={15} />, bg: "var(--good)", color: "#0e1712", border: "none" },
-                0.5: { label: t("halfDay"), icon: <Calendar size={15} />, bg: "var(--warn)", color: "#1a1608", border: "none" },
-                0: { label: t("absent"), icon: <XCircle size={15} />, bg: "var(--bad)", color: "#1c0e0c", border: "none" },
-              };
-              const cfg = statusConfig[st === null ? "null" : st];
-
               return (
-                <button
+                <AttendanceStatusRow
                   key={emp.id}
-                  type="button"
-                  disabled={isFuture}
-                  onClick={cycleStatus}
-                  className="w-full card rounded-xl p-3.5 flex items-center justify-between gap-3 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-left"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <Avatar src={emp.avatar} name={emp.name} size={32} />
-                    <div className="min-w-0">
-                      <div className="text-[var(--text-primary)] text-sm font-medium truncate">{emp.name}</div>
-                      <div className="text-[var(--text-muted)] text-[11px]">{fmt(emp.dailyWage)}{t("perDay")}</div>
-                    </div>
-                  </div>
-                  <span
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold shrink-0"
-                    style={{ backgroundColor: cfg.bg, color: cfg.color, border: cfg.border }}
-                  >
-                    {cfg.icon} {cfg.label}
-                  </span>
-                </button>
+                  emp={emp}
+                  status={st}
+                  isFuture={isFuture}
+                  onCycle={() => markAttendance(emp.id, nextStatus())}
+                />
               );
             })}
           </div>
@@ -2106,7 +2239,7 @@ function AdminApp({
                 <Field label={t("note")} value={advForm.note} onChange={(v) => setAdvForm({ ...advForm, note: v })} />
               </div>
             </div>
-            <button type="button" onClick={addAdvance} className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[#12161c] text-xs font-semibold hover:opacity-90 transition-opacity" style={{ backgroundColor: accent }}>
+            <button type="button" onClick={addAdvance} className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[#12161c] text-xs font-semibold hover:opacity-90 transition-opacity" style={{ background: accentGradient(accent) }}>
               <Plus size={14} /> {(advForm.type === "salary") ? t("addSalaryPayment") : t("addAdvance")}
             </button>
           </div>
@@ -2114,7 +2247,12 @@ function AdminApp({
           {advEmp && (
             <div className="card rounded-xl p-5">
               <div className="text-[var(--text-primary)] text-sm font-semibold mb-3">{t("advanceHistory")}</div>
-              {(advances[advEmp] || []).length === 0 && <p className="text-[var(--text-muted)] text-xs">{t("noAdvances")}</p>}
+              {(advances[advEmp] || []).length === 0 && (
+                <div className="flex flex-col items-center gap-2 py-6 text-center">
+                  <Wallet size={18} className="text-[var(--text-faint)]" />
+                  <p className="text-[var(--text-muted)] text-xs">{t("noAdvances")}</p>
+                </div>
+              )}
               <div className="space-y-2">
                 {(advances[advEmp] || []).slice().reverse().map((a) => (
                   <div key={a.id} className="flex items-center justify-between text-sm py-1.5">
@@ -2149,9 +2287,11 @@ function AdminApp({
             return (
               <div className="card rounded-xl p-6 text-center">
                 <div className="text-[var(--text-muted)] text-xs mb-1.5">Jami to'lash kerak</div>
-                <div className={`text-3xl font-bold font-mono tabular-nums ${totalOwed > 0 ? "text-[var(--bad)]" : "text-[var(--good)]"}`}>
-                  {fmt(totalOwed)}
-                </div>
+                <AnimatedAmount
+                  value={totalOwed}
+                  formatter={fmt}
+                  className={`text-3xl font-bold font-mono tabular-nums ${totalOwed > 0 ? "text-[var(--bad)]" : "text-[var(--good)]"}`}
+                />
               </div>
             );
           })()}
@@ -2165,7 +2305,7 @@ function AdminApp({
                 type="button"
                 onClick={exportReportToExcel}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[#12161c] text-xs font-semibold hover:opacity-90 transition-opacity shrink-0"
-                style={{ backgroundColor: accent }}
+                style={{ background: accentGradient(accent) }}
               >
                 <Download size={13} /> Excel
               </button>
@@ -2345,9 +2485,7 @@ function EmployeeApp({
               <div className="flex items-center justify-center gap-1.5 text-[var(--text-muted)] text-xs mb-1.5">
                 <Wallet size={13} /> {t("statRemainingSalary")}
               </div>
-              <div className="text-3xl font-bold font-mono tabular-nums text-[var(--good)]">
-                {fmt(s.remaining)}
-              </div>
+              <AnimatedAmount value={s.remaining} formatter={fmt} className="text-3xl font-bold font-mono tabular-nums text-[var(--good)]" />
             </div>
             <div className="card rounded-xl overflow-hidden grid grid-cols-2">
               <StatCell label={t("statWorkedDays")} value={fmtDays(s.workedDays)} icon={<Calendar size={12} />} border="r b" />
@@ -2481,7 +2619,8 @@ function EmployeeApp({
               </div>
 
               {filteredAdv.length === 0 && (
-                <div className="card rounded-xl p-8 text-center">
+                <div className="card rounded-xl p-8 flex flex-col items-center gap-2 text-center">
+                  <Wallet size={20} className="text-[var(--text-faint)]" />
                   <p className="text-[var(--text-muted)] text-xs">{t("noAdvancesYet")}</p>
                 </div>
               )}
@@ -3171,6 +3310,15 @@ function WorkforceAppInner() {
             to { opacity: 1; transform: translateY(0); }
           }
           .tab-transition { animation: fadeSlideIn 0.28s ease-out; }
+
+          /* YANGI: davomat holatini bosganda badge biroz kattalashib qaytadi —
+             rang almashishi "qattiq" tuyulmasligi uchun. */
+          @keyframes statusPop {
+            0% { transform: scale(1); }
+            45% { transform: scale(1.14); }
+            100% { transform: scale(1); }
+          }
+          .status-pop { animation: statusPop 0.28s ease; }
 
           /* YANGI: tekis (flat), zamonaviy uslub. Har bir "kartochka" nozik
              border va bitta yumshoq soya bilan ajralib turadi — ikki tomonlama
