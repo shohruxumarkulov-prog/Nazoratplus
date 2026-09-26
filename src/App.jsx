@@ -528,14 +528,14 @@ function EmptyState({ icon, text, actionLabel, onAction }) {
 // YANGI: pul summasi o'zgarganda eski qiymatdan yangi qiymatgacha animatsiyali
 // sanaydi — faqat 1-2 ta muhim joyda (umumiy qoldiq, jami qarz) ishlatiladi.
 function AnimatedAmount({ value, formatter, className }) {
-  const [display, setDisplay] = useState(value);
-  const prevRef = useRef(value);
+  const [display, setDisplay] = useState(0);
+  const prevRef = useRef(0);
   const rafRef = useRef(null);
 
   useEffect(() => {
     const from = prevRef.current;
     const to = value;
-    if (from === to) return;
+    if (from === to) { setDisplay(to); return; }
     const start = performance.now();
     const duration = 650;
     function tick(now) {
