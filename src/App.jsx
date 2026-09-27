@@ -4,7 +4,7 @@ import {
   XCircle, Eye, EyeOff, UserPlus, ShieldCheck, ClipboardList, TrendingDown,
   MoreVertical, Copy, Check, CheckCheck, KeyRound, Settings, Lock, X, Palette, Type,
   Camera, Globe, User as UserIcon, ChevronDown, Sun, Moon, ChevronLeft, ChevronRight,
-  Menu, ChevronUp, UserX, ArrowLeft, Paintbrush, Download, Send, Bell, Search, LayoutDashboard, Home, Share2
+  Menu, ChevronUp, UserX, ArrowLeft, Paintbrush, Download, Send, Bell, Search, LayoutDashboard, Home, Share2, MessageCircle, Mail
 } from "lucide-react";
 import { supabase } from "./lib/supabase";
 import * as XLSX from "xlsx";
@@ -2049,6 +2049,54 @@ function MonthlyTimesheet({ employees, attendance }) {
   );
 }
 
+// YANGI: Ba'zi qurilma/brauzerlarda tizimning umumiy ulashish oynasi (Web Share API)
+// ishlamaydi yoki mavjud emas — bunday holatda kod jim-jim to'g'ridan-to'g'ri
+// yuklab olishga o'tib ketardi, ulashish imkoniyati umuman ko'rinmasdi. Endi bu
+// holatda o'zimizning kafolatlangan ulashish varag'imiz chiqadi: Telegram va
+// WhatsApp'ga matnli xulosa bilan to'g'ridan-to'g'ri o'tish, Email orqali yuborish,
+// yoki Excel faylini yuklab olish (keyin istalgan ilovaga qo'lda biriktirish mumkin).
+function ShareMenu({ open, onClose, onTelegram, onWhatsapp, onEmail, onExcel }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end" onClick={onClose}>
+      <div
+        className="w-full bg-[var(--bg-panel)] rounded-t-3xl p-5 pb-8"
+        style={{ animation: "sheetSlideUp 0.25s ease-out" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="w-10 h-1 rounded-full bg-[var(--border-input)] mx-auto mb-4" />
+        <div className="text-[var(--text-primary)] text-sm font-semibold mb-4 text-center">Ulashish</div>
+        <div className="grid grid-cols-4 gap-3">
+          <button type="button" onClick={onTelegram} className="flex flex-col items-center gap-1.5">
+            <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: "#2aa9de" }}>
+              <Send size={20} className="text-white" />
+            </div>
+            <span className="text-[10px] text-[var(--text-secondary)]">Telegram</span>
+          </button>
+          <button type="button" onClick={onWhatsapp} className="flex flex-col items-center gap-1.5">
+            <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: "#25D366" }}>
+              <MessageCircle size={20} className="text-white" />
+            </div>
+            <span className="text-[10px] text-[var(--text-secondary)]">WhatsApp</span>
+          </button>
+          <button type="button" onClick={onEmail} className="flex flex-col items-center gap-1.5">
+            <div className="w-12 h-12 rounded-full flex items-center justify-center bg-[var(--bg-app)] border border-[var(--border-input)]">
+              <Mail size={20} className="text-[var(--text-secondary)]" />
+            </div>
+            <span className="text-[10px] text-[var(--text-secondary)]">Email</span>
+          </button>
+          <button type="button" onClick={onExcel} className="flex flex-col items-center gap-1.5">
+            <div className="w-12 h-12 rounded-full flex items-center justify-center bg-[var(--bg-app)] border border-[var(--border-input)]">
+              <Download size={20} className="text-[var(--text-secondary)]" />
+            </div>
+            <span className="text-[10px] text-[var(--text-secondary)]">Excel</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AdminApp({
   usersData, currentUser, onLogout, summaryFor,
   adminTab, setAdminTab,
@@ -2128,33 +2176,52 @@ function AdminApp({
     });
     return `${t("reportHeader")} — ${todayISO()}\n\n${lines.join("\n")}`;
   }
-  // YANGI: "Ulashish" — brauzerning tabiiy ulashish oynasini ochadi (Web Share API).
-  // Shu orqali foydalanuvchi hisobotni Telegram, WhatsApp, Gmail va hokazolarga
-  // to'g'ridan-to'g'ri yubora oladi (fayl sifatida). SMS kabi fayl qabul qilmaydigan
-  // kanallar uchun avtomatik matnli xulosaga tushadi. Agar qurilma/brauzer umuman
-  // ulashishni qo'llab-quvvatlamasa (masalan kompyuter), oddiy Excel yuklab olishga tushadi.
+  // YANGI: "Ulashish" — avval brauzerning tabiiy ulashish oynasini (Web Share API)
+  // ochishga harakat qiladi. Lekin ba'zi qurilma/brauzerlarda bu API umuman
+  // mavjud emas yoki xato beradi — bunday holatda endi jim-jim yuklab olishga
+  // O'TIB KETMAYDI, o'rniga o'zimizning kafolatlangan ulashish varag'i (ShareMenu)
+  // ochiladi: Telegram/WhatsApp/Email/Excel variantlari bilan.
   async function shareReport() {
-    const wb = buildReportWorkbook();
-    const fileName = `hisobot-${todayISO()}.xlsx`;
-    try {
-      const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-      const blob = new Blob([wbout], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-      const file = new File([blob], fileName, { type: blob.type });
-      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: t("reportHeader") });
-        return;
-      }
-      if (navigator.share) {
+    if (typeof navigator.share === "function") {
+      try {
+        const wb = buildReportWorkbook();
+        const fileName = `hisobot-${todayISO()}.xlsx`;
+        const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+        const blob = new Blob([wbout], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+        const file = new File([blob], fileName, { type: blob.type });
+        if (typeof navigator.canShare !== "function" || navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: t("reportHeader") });
+          return;
+        }
         await navigator.share({ title: t("reportHeader"), text: buildReportTextSummary() });
         return;
+      } catch (e) {
+        if (e && e.name === "AbortError") return; // foydalanuvchi ulashishni bekor qildi
+        // boshqa xato bo'lsa — pastdagi o'z menyumizga o'tamiz
       }
-    } catch (e) {
-      if (e && e.name === "AbortError") return; // foydalanuvchi ulashishni bekor qildi
     }
-    XLSX.writeFile(wb, fileName);
+    setShareMenuOpen(true);
+  }
+
+  function shareViaTelegram() {
+    window.open(`https://t.me/share/url?url=&text=${encodeURIComponent(buildReportTextSummary())}`, "_blank");
+    setShareMenuOpen(false);
+  }
+  function shareViaWhatsapp() {
+    window.open(`https://wa.me/?text=${encodeURIComponent(buildReportTextSummary())}`, "_blank");
+    setShareMenuOpen(false);
+  }
+  function shareViaEmail() {
+    window.location.href = `mailto:?subject=${encodeURIComponent(t("reportHeader"))}&body=${encodeURIComponent(buildReportTextSummary())}`;
+    setShareMenuOpen(false);
+  }
+  function shareViaExcelDownload() {
+    XLSX.writeFile(buildReportWorkbook(), `hisobot-${todayISO()}.xlsx`);
+    setShareMenuOpen(false);
   }
   const [weekOffset, setWeekOffset] = useState(0);
   const [attView, setAttView] = useState("daily"); // "daily" | "monthly"
+  const [shareMenuOpen, setShareMenuOpen] = useState(false);
   const [pendingBulk, setPendingBulk] = useState(null); // { status, label } yoki null
   const dateStrip = (() => {
     const today = new Date();
@@ -2220,6 +2287,14 @@ function AdminApp({
         notifications={notifications}
         onMarkAllRead={() => markAllNotificationsRead()}
         onMarkRead={markNotificationRead}
+      />
+      <ShareMenu
+        open={shareMenuOpen}
+        onClose={() => setShareMenuOpen(false)}
+        onTelegram={shareViaTelegram}
+        onWhatsapp={shareViaWhatsapp}
+        onEmail={shareViaEmail}
+        onExcel={shareViaExcelDownload}
       />
       <Shell
         title={t("adminPanel")}
