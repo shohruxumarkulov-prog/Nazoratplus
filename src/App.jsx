@@ -515,7 +515,7 @@ function EmptyState({ icon, text, actionLabel, onAction }) {
         <button
           type="button"
           onClick={onAction}
-          className="mt-1 flex items-center gap-1.5 px-4 py-2 rounded-lg text-[#12161c] text-xs font-semibold hover:opacity-90 transition-opacity"
+          className="mt-1 flex items-center gap-1.5 px-4 py-2 rounded-lg text-white text-xs font-semibold hover:opacity-90 transition-opacity"
           style={{ background: accentGradient(accent) }}
         >
           <Plus size={14} /> {actionLabel}
@@ -1220,7 +1220,7 @@ function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage, onResetPassword 
               <Field label="Yangi parol" type="password" value={resetPw} onChange={setResetPw} />
               {resetMsg && <p className="text-[var(--text-secondary)] text-xs">{resetMsg}</p>}
               <div className="flex gap-2">
-                <button type="button" onClick={submitReset} className="flex-1 py-2 rounded-lg text-[#12161c] text-xs font-semibold hover:opacity-90 transition-opacity" style={{ background: accentGradient(accent) }}>
+                <button type="button" onClick={submitReset} className="flex-1 py-2 rounded-lg text-white text-xs font-semibold hover:opacity-90 transition-opacity" style={{ background: accentGradient(accent) }}>
                   {t("save")}
                 </button>
                 <button type="button" onClick={() => { setResetOpen(false); setResetPw(""); }} className="flex-1 py-2 rounded-lg field text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors">
@@ -1249,7 +1249,7 @@ function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage, onResetPassword 
             <div className="field rounded-lg p-3 space-y-2 my-2">
               <MoneyField label={t("newDailyWage")} value={wageDraft} onChange={setWageDraft} suffix="so'm" />
               <div className="flex gap-2">
-                <button type="button" onClick={saveWage} className="flex-1 py-2 rounded-lg text-[#12161c] text-xs font-semibold hover:opacity-90 transition-opacity" style={{ background: accentGradient(accent) }}>
+                <button type="button" onClick={saveWage} className="flex-1 py-2 rounded-lg text-white text-xs font-semibold hover:opacity-90 transition-opacity" style={{ background: accentGradient(accent) }}>
                   {t("save")}
                 </button>
                 <button type="button" onClick={() => setEditingWage(false)} className="flex-1 py-2 rounded-lg field text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors">
@@ -1724,7 +1724,7 @@ function ProfileDrawer({
               type="button"
               disabled={saveBusy}
               onClick={submitPassword}
-              className="mt-3 w-full py-2.5 rounded-lg text-[#12161c] text-xs font-semibold hover:opacity-90 transition-opacity disabled:opacity-60"
+              className="mt-3 w-full py-2.5 rounded-lg text-white text-xs font-semibold hover:opacity-90 transition-opacity disabled:opacity-60"
               style={{ background: accentGradient(accent) }}
             >
               {saveBusy ? t("loading") : t("save")}
@@ -1804,6 +1804,135 @@ function ProfileDrawer({
         )}
       </div>
     </>
+  );
+}
+
+// YANGI: Avanslar tarixi endi oylarga guruhlangan holda (akkordeon) ko'rsatiladi —
+// ro'yxat cheksiz cho'zilib ketmasligi uchun. Har bir oy yopiq/ochiq bo'lishi mumkin,
+// sarlavhada shu oy uchun jami summa ham ko'rsatiladi. Yozuvni o'chirishdan oldin
+// endi "Ha / Yo'q" bilan tasdiqlash so'raladi — tasodifiy bosilib ketishning oldini oladi.
+function AdvanceHistoryRow({ a, t, onDelete }) {
+  const [confirming, setConfirming] = useState(false);
+  return (
+    <div className="flex items-center gap-3 py-2.5 border-b border-[var(--border-soft)] last:border-b-0">
+      <div
+        className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
+        style={a.type === "salary" ? { backgroundColor: "var(--good-soft)", color: "var(--good)" } : { backgroundColor: "var(--warn-soft)", color: "var(--warn)" }}
+      >
+        {a.type === "salary" ? <Wallet size={14} /> : <TrendingDown size={14} />}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-[var(--text-primary)] text-sm font-semibold font-mono tabular-nums">{fmt(a.amount)}</span>
+          <span
+            className="text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full"
+            style={a.type === "salary" ? { backgroundColor: "var(--good-soft)", color: "var(--good)" } : { backgroundColor: "var(--warn-soft)", color: "var(--warn)" }}
+          >
+            {a.type === "salary" ? t("typeSalary") : t("typeAvans")}
+          </span>
+        </div>
+        <div className="text-[var(--text-muted)] text-xs mt-0.5 truncate">
+          {a.date}{a.note ? ` · ${a.note}` : ""}
+        </div>
+      </div>
+
+      {!confirming ? (
+        <button
+          type="button"
+          onClick={() => setConfirming(true)}
+          className="p-1.5 rounded-md text-[var(--text-muted)] hover:text-[var(--bad)] hover:bg-[var(--bad-soft)] transition-colors shrink-0"
+          aria-label="O'chirish"
+        >
+          <Trash2 size={14} />
+        </button>
+      ) : (
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            type="button"
+            onClick={() => { onDelete(); setConfirming(false); }}
+            className="px-2.5 py-1 rounded-md bg-[var(--bad)] text-white text-[10px] font-semibold"
+          >
+            Ha
+          </button>
+          <button
+            type="button"
+            onClick={() => setConfirming(false)}
+            className="px-2.5 py-1 rounded-md field text-[var(--text-secondary)] text-[10px] font-medium"
+          >
+            Yo'q
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AdvanceHistoryCard({ list, onDelete }) {
+  const { t, lang } = useApp();
+  const localeTag = lang === "ru" ? "ru-RU" : lang === "en" ? "en-US" : "uz-UZ";
+  const monthNamesUz = ["Yanvar", "Fevral", "Mart", "Aprel", "May", "Iyun", "Iyul", "Avgust", "Sentabr", "Oktabr", "Noyabr", "Dekabr"];
+
+  const sorted = list.slice().sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+
+  const groups = [];
+  const groupIndex = {};
+  for (const a of sorted) {
+    const key = a.date.slice(0, 7);
+    if (!(key in groupIndex)) {
+      groupIndex[key] = groups.length;
+      groups.push({ key, items: [] });
+    }
+    groups[groupIndex[key]].items.push(a);
+  }
+
+  const [openKey, setOpenKey] = useState(groups[0]?.key ?? null);
+
+  function monthLabel(key) {
+    const [y, m] = key.split("-").map(Number);
+    const name = lang === "uz" ? monthNamesUz[m - 1] : new Date(y, m - 1, 1).toLocaleDateString(localeTag, { month: "long" });
+    return `${name} ${y}`;
+  }
+
+  return (
+    <div className="card rounded-xl p-5">
+      <div className="text-[var(--text-primary)] text-sm font-semibold mb-3">{t("advanceHistory")}</div>
+
+      {list.length === 0 && (
+        <div className="flex flex-col items-center gap-2 py-6 text-center">
+          <Wallet size={18} className="text-[var(--text-faint)]" />
+          <p className="text-[var(--text-muted)] text-xs">{t("noAdvances")}</p>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        {groups.map((g) => {
+          const isOpen = openKey === g.key;
+          const groupTotal = g.items.reduce((sum, a) => sum + Number(a.amount), 0);
+          return (
+            <div key={g.key} className="rounded-lg overflow-hidden field">
+              <button
+                type="button"
+                onClick={() => setOpenKey(isOpen ? null : g.key)}
+                className="w-full flex items-center justify-between px-3.5 py-2.5"
+              >
+                <span className="text-[var(--text-primary)] text-xs font-semibold capitalize">{monthLabel(g.key)}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[var(--text-muted)] text-[11px] font-mono tabular-nums">{fmt(groupTotal)}</span>
+                  <ChevronDown size={14} className={`text-[var(--text-muted)] transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                </div>
+              </button>
+              {isOpen && (
+                <div className="px-3.5 pb-1 bg-[var(--bg-card)]">
+                  {g.items.map((a) => (
+                    <AdvanceHistoryRow key={a.id} a={a} t={t} onDelete={() => onDelete(a.id)} />
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -1989,7 +2118,7 @@ function AdminApp({
                 type="button"
                 disabled={addBusy}
                 onClick={async () => { setAddBusy(true); const ok = await addEmployee(); setAddBusy(false); if (ok) setShowAddForm(false); }}
-                className="mt-4 flex items-center gap-1.5 px-4 py-2 rounded-lg text-[#12161c] text-xs font-semibold hover:opacity-90 transition-opacity disabled:opacity-60"
+                className="mt-4 flex items-center gap-1.5 px-4 py-2 rounded-lg text-white text-xs font-semibold hover:opacity-90 transition-opacity disabled:opacity-60"
                 style={{ background: accentGradient(accent) }}
               >
                 <Plus size={14} /> {addBusy ? t("loading") : t("add")}
@@ -2260,40 +2389,16 @@ function AdminApp({
                 <Field label={t("note")} value={advForm.note} onChange={(v) => setAdvForm({ ...advForm, note: v })} />
               </div>
             </div>
-            <button type="button" onClick={addAdvance} className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[#12161c] text-xs font-semibold hover:opacity-90 transition-opacity" style={{ background: accentGradient(accent) }}>
+            <button type="button" onClick={addAdvance} className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-white text-xs font-semibold hover:opacity-90 transition-opacity" style={{ background: accentGradient(accent) }}>
               <Plus size={14} /> {(advForm.type === "salary") ? t("addSalaryPayment") : t("addAdvance")}
             </button>
           </div>
 
           {advEmp && (
-            <div className="card rounded-xl p-5">
-              <div className="text-[var(--text-primary)] text-sm font-semibold mb-3">{t("advanceHistory")}</div>
-              {(advances[advEmp] || []).length === 0 && (
-                <div className="flex flex-col items-center gap-2 py-6 text-center">
-                  <Wallet size={18} className="text-[var(--text-faint)]" />
-                  <p className="text-[var(--text-muted)] text-xs">{t("noAdvances")}</p>
-                </div>
-              )}
-              <div className="space-y-2">
-                {(advances[advEmp] || []).slice().reverse().map((a) => (
-                  <div key={a.id} className="flex items-center justify-between text-sm py-1.5">
-                    <div>
-                      <span className="text-[var(--text-primary)] font-mono tabular-nums">{fmt(a.amount)}</span>
-                      <span
-                        className="text-[9px] uppercase tracking-wide ml-2 px-1.5 py-0.5 rounded"
-                        style={a.type === "salary" ? { backgroundColor: "var(--good-soft)", color: "var(--good)" } : { backgroundColor: "var(--warn-soft)", color: "var(--warn)" }}
-                      >
-                        {a.type === "salary" ? t("typeSalary") : t("typeAvans")}
-                      </span>
-                      <span className="text-[var(--text-muted)] text-xs ml-2">{a.date}{a.note ? ` · ${a.note}` : ""}</span>
-                    </div>
-                    <button onClick={() => deleteAdvance(advEmp, a.id)} className="text-[var(--text-muted)] hover:text-[var(--bad)]">
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <AdvanceHistoryCard
+              list={advances[advEmp] || []}
+              onDelete={(advId) => deleteAdvance(advEmp, advId)}
+            />
           )}
         </div>
       )}
@@ -2325,7 +2430,7 @@ function AdminApp({
               <button
                 type="button"
                 onClick={exportReportToExcel}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[#12161c] text-xs font-semibold hover:opacity-90 transition-opacity shrink-0"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-xs font-semibold hover:opacity-90 transition-opacity shrink-0"
                 style={{ background: accentGradient(accent) }}
               >
                 <Download size={13} /> Excel
