@@ -1994,7 +1994,7 @@ function MonthlyTimesheet({ employees, attendance }) {
       {employees.length === 0 ? (
         <p className="text-[var(--text-muted)] text-sm text-center py-8">{t("noEmployees")}</p>
       ) : (
-        <div className="overflow-x-auto -mx-4 px-4">
+        <div data-noswipe="true" className="overflow-x-auto -mx-4 px-4">
           <table style={{ borderCollapse: "separate", borderSpacing: "2px" }}>
             <thead>
               <tr>
@@ -2076,6 +2076,15 @@ function AdminApp({
   const touchStartX = useRef(null);
   const touchStartY = useRef(null);
   function handleTouchStart(e) {
+    // FIX: jadval kabi o'zining ichki gorizontal skrolli bo'lgan joylardan
+    // boshlangan barmoq harakati endi tab almashtirish sifatida talqin qilinmaydi —
+    // aks holda jadvalni o'ngga-chapga surish "boshqa bo'limga o'tib ketish"ga
+    // olib kelardi. Bunday zonalar data-noswipe atributi bilan belgilanadi.
+    if (e.target.closest && e.target.closest("[data-noswipe]")) {
+      touchStartX.current = null;
+      touchStartY.current = null;
+      return;
+    }
     touchStartX.current = e.touches[0].clientX;
     touchStartY.current = e.touches[0].clientY;
   }
@@ -2111,9 +2120,6 @@ function AdminApp({
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, t("reportHeader").slice(0, 31));
     return wb;
-  }
-  function exportReportToExcel() {
-    XLSX.writeFile(buildReportWorkbook(), `hisobot-${todayISO()}.xlsx`);
   }
   function buildReportTextSummary() {
     const lines = myEmployees.map((emp) => {
@@ -2601,27 +2607,20 @@ function AdminApp({
           })()}
         <div className="card rounded-xl overflow-hidden">
           <div className="p-5 pb-3 flex items-center justify-between gap-2">
-            <div className="text-[var(--text-primary)] text-sm font-semibold flex items-center gap-1.5">
-              <ClipboardList size={15} /> {t("reportHeader")}
+            <div className="text-[var(--text-primary)] text-sm font-semibold flex items-center gap-1.5 min-w-0">
+              <ClipboardList size={15} className="shrink-0" /> <span className="truncate">{t("reportHeader")}</span>
             </div>
             {myEmployees.length > 0 && (
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={shareReport}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg field text-[var(--text-secondary)] text-xs font-semibold hover:text-[var(--text-primary)] transition-colors"
-                >
-                  <Share2 size={13} /> Ulashish
-                </button>
-                <button
-                  type="button"
-                  onClick={exportReportToExcel}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-xs font-semibold hover:opacity-90 transition-opacity shrink-0"
-                  style={{ background: accentGradient(accent) }}
-                >
-                  <Download size={13} /> Excel
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={shareReport}
+                aria-label="Ulashish"
+                title="Ulashish"
+                className="w-9 h-9 rounded-lg flex items-center justify-center text-white hover:opacity-90 transition-opacity shrink-0"
+                style={{ background: accentGradient(accent) }}
+              >
+                <Share2 size={16} />
+              </button>
             )}
           </div>
           <div className="overflow-x-auto">
