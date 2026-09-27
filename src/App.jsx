@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, createContext, useContext, Component } fro
 import {
   Users, Calendar, Wallet, LogOut, Plus, Trash2, CheckCircle2,
   XCircle, Eye, EyeOff, UserPlus, ShieldCheck, ClipboardList, TrendingDown,
-  MoreVertical, Copy, Check, KeyRound, Settings, Lock, X, Palette, Type,
+  MoreVertical, Copy, Check, CheckCheck, KeyRound, Settings, Lock, X, Palette, Type,
   Camera, Globe, User as UserIcon, ChevronDown, Sun, Moon, ChevronLeft, ChevronRight,
   Menu, ChevronUp, UserX, ArrowLeft, Paintbrush, Download, Send, Bell, Search, LayoutDashboard, Home
 } from "lucide-react";
@@ -1372,8 +1372,16 @@ function MenuRow({ icon, label, onClick, danger }) {
   );
 }
 
-function NotificationPanel({ open, onClose, notifications, onMarkAllRead }) {
+function NotificationPanel({ open, onClose, notifications, onMarkAllRead, onMarkRead }) {
   const { t } = useApp();
+  const [selected, setSelected] = useState(null);
+  const hasUnread = notifications.some((n) => !n.is_read);
+
+  function openNotification(n) {
+    setSelected(n);
+    if (!n.is_read) onMarkRead(n.id);
+  }
+
   return (
     <>
       {open && (
@@ -1388,45 +1396,77 @@ function NotificationPanel({ open, onClose, notifications, onMarkAllRead }) {
           <span className="text-[var(--text-primary)] text-sm font-semibold flex items-center gap-1.5">
             <Bell size={16} /> {t("notifications")}
           </span>
-          <button type="button" onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
-            <X size={18} />
-          </button>
-        </div>
-
-        {notifications.length > 0 && (
-          <div className="px-5 pt-3">
-            <button
-              type="button"
-              onClick={onMarkAllRead}
-              className="text-[var(--accent)] text-xs font-medium hover:opacity-80 transition-opacity"
-            >
-              {t("markAllRead")}
+          <div className="flex items-center gap-1">
+            {hasUnread && (
+              <button
+                type="button"
+                onClick={onMarkAllRead}
+                aria-label={t("markAllRead")}
+                title={t("markAllRead")}
+                className="p-1.5 rounded-md text-[var(--accent)] hover:bg-[var(--bg-app)] transition-colors"
+              >
+                <CheckCheck size={17} />
+              </button>
+            )}
+            <button type="button" onClick={onClose} className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
+              <X size={18} />
             </button>
           </div>
-        )}
+        </div>
 
         <div className="px-5 py-4 space-y-2.5">
           {notifications.length === 0 && (
             <p className="text-[var(--text-muted)] text-sm text-center py-10">{t("noNotifications")}</p>
           )}
           {notifications.map((n) => (
-            <div
+            <button
+              type="button"
               key={n.id}
-              className="card rounded-xl p-3.5"
+              onClick={() => openNotification(n)}
+              className="w-full text-left card rounded-xl p-3.5 active:scale-[0.99] transition-transform"
               style={!n.is_read ? { borderColor: "var(--accent)" } : undefined}
             >
               <div className="flex items-center justify-between gap-2 mb-1">
                 <span className="text-[var(--text-primary)] text-sm font-semibold">{n.title}</span>
                 {!n.is_read && <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: "var(--accent)" }} />}
               </div>
-              <p className="text-[var(--text-secondary)] text-xs leading-snug">{n.body}</p>
+              <p className="text-[var(--text-secondary)] text-xs leading-snug line-clamp-2">{n.body}</p>
               <p className="text-[var(--text-faint)] text-[10px] mt-1.5">
                 {new Date(n.created_at).toLocaleString()}
               </p>
-            </div>
+            </button>
           ))}
         </div>
       </div>
+
+      {/* To'liq xabar — pastdan chiqadigan varaq */}
+      {selected && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end" onClick={() => setSelected(null)}>
+          <div
+            className="w-full bg-[var(--bg-panel)] rounded-t-3xl p-5 pb-8 max-h-[70vh] overflow-y-auto"
+            style={{ animation: "sheetSlideUp 0.25s ease-out" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-10 h-1 rounded-full bg-[var(--border-input)] mx-auto mb-4" />
+            <div className="flex items-start justify-between gap-3 mb-2">
+              <span className="text-[var(--text-primary)] text-base font-semibold">{selected.title}</span>
+              <button
+                type="button"
+                onClick={() => setSelected(null)}
+                className="text-[var(--text-muted)] hover:text-[var(--text-primary)] shrink-0"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <p className="text-[var(--text-faint)] text-[11px] mb-3">
+              {new Date(selected.created_at).toLocaleString()}
+            </p>
+            <p className="text-[var(--text-secondary)] text-sm leading-relaxed whitespace-pre-wrap">
+              {selected.body}
+            </p>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -1774,7 +1814,7 @@ function AdminApp({
   attendance, attDate, setAttDate, markAttendance, bulkMarkAttendance,
   advances, advEmp, setAdvEmp, advForm, setAdvForm, addAdvance, deleteAdvance,
   changeOwnCredentials, updateAvatar, deleteOwnAccount, accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang, enableNotifications,
-  notifications, markAllNotificationsRead, linkTelegram,
+  notifications, markAllNotificationsRead, markNotificationRead, linkTelegram,
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -1893,6 +1933,7 @@ function AdminApp({
         onClose={() => setNotifOpen(false)}
         notifications={notifications}
         onMarkAllRead={() => markAllNotificationsRead()}
+        onMarkRead={markNotificationRead}
       />
       <Shell
         title={t("adminPanel")}
@@ -1919,26 +1960,6 @@ function AdminApp({
       <div key={adminTab} className="tab-transition" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
       {adminTab === "employees" && (
         <div className="space-y-5">
-          {myEmployees.length > 0 && (() => {
-            const todayMarked = myEmployees.filter((emp) => attendance[emp.id]?.[todayISO()] !== undefined).length;
-            if (todayMarked > 0) return null;
-            return (
-              <div className="flex items-center gap-2.5 rounded-lg p-3" style={{ backgroundColor: "var(--warn-soft)", border: "1px solid var(--warn)" }}>
-                <Bell size={16} style={{ color: "var(--warn)" }} className="shrink-0" />
-                <span className="text-xs font-medium flex-1" style={{ color: "var(--warn)" }}>
-                  Bugun hali hech kim uchun davomat belgilanmagan
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setAdminTab("attendance")}
-                  className="text-xs font-semibold shrink-0 hover:opacity-80 transition-opacity"
-                  style={{ color: "var(--warn)" }}
-                >
-                  Belgilash →
-                </button>
-              </div>
-            );
-          })()}
           {!showAddForm ? (
             <button
               type="button"
@@ -2856,6 +2877,12 @@ function WorkforceAppInner() {
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
   }
 
+  async function markNotificationRead(id) {
+    if (!currentUser || currentUser.role !== "admin") return;
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
+    await supabase.from("notifications").update({ is_read: true }).eq("id", id);
+  }
+
   // ============================================================================
   // LOGIN / RO'YXATDAN O'TISH
   // ============================================================================
@@ -3264,6 +3291,7 @@ function WorkforceAppInner() {
         enableNotifications={enableNotifications}
         notifications={notifications}
         markAllNotificationsRead={markAllNotificationsRead}
+        markNotificationRead={markNotificationRead}
         linkTelegram={linkTelegram}
       />
     );
@@ -3319,6 +3347,13 @@ function WorkforceAppInner() {
             100% { transform: scale(1); }
           }
           .status-pop { animation: statusPop 0.28s ease; }
+
+          /* YANGI: bildirishnoma pastdan chiqadigan varaq (bottom sheet)
+             ochilganda pastdan tepaga sirg'alib chiqadi. */
+          @keyframes sheetSlideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+          }
 
           /* YANGI: tekis (flat), zamonaviy uslub. Har bir "kartochka" nozik
              border va bitta yumshoq soya bilan ajralib turadi — ikki tomonlama
