@@ -4,7 +4,7 @@ import {
   XCircle, Eye, EyeOff, UserPlus, ShieldCheck, ClipboardList, TrendingDown,
   MoreVertical, Copy, Check, CheckCheck, KeyRound, Settings, Lock, X, Palette, Type,
   Camera, Globe, User as UserIcon, ChevronDown, Sun, Moon, ChevronLeft, ChevronRight,
-  Menu, ChevronUp, UserX, ArrowLeft, Paintbrush, Download, Send, Bell, Search, LayoutDashboard, Home
+  Menu, ChevronUp, UserX, ArrowLeft, Paintbrush, Download, Send, Bell, Search, LayoutDashboard, Home, Share2
 } from "lucide-react";
 import { supabase } from "./lib/supabase";
 import * as XLSX from "xlsx";
@@ -1703,9 +1703,7 @@ function ProfileDrawer({
             <MenuRow icon={<KeyRound size={18} className="text-[var(--accent)]" />} label={t("updateCredentials")} onClick={() => setPage("credentials")} />
             <MenuRow icon={<Send size={18} className="text-[#2aa9de]" />} label={tgBusy ? t("loading") : "Telegramga ulash (parolni tiklash uchun)"} onClick={handleLinkTelegram} />
             {tgMsg && <p className="text-[var(--text-secondary)] text-xs pb-3 -mt-1">{tgMsg}</p>}
-            {isAdmin && (
-              <MenuRow icon={<Send size={18} className="text-[var(--good)]" />} label={t("enableNotifications")} onClick={enableNotifications} />
-            )}
+            <MenuRow icon={<Send size={18} className="text-[var(--good)]" />} label={t("enableNotifications")} onClick={enableNotifications} />
           </div>
         )}
 
@@ -1831,8 +1829,9 @@ function AdvanceHistoryRow({ a, t, onDelete }) {
             {a.type === "salary" ? t("typeSalary") : t("typeAvans")}
           </span>
         </div>
-        <div className="text-[var(--text-muted)] text-xs mt-0.5 truncate">
-          {a.date}{a.note ? ` · ${a.note}` : ""}
+        <div className="text-xs mt-0.5 truncate">
+          <span className="text-[var(--text-muted)]">{a.date}</span>
+          {a.note && <span className="text-[var(--text-primary)] font-semibold"> · {a.note}</span>}
         </div>
       </div>
 
@@ -1936,6 +1935,120 @@ function AdvanceHistoryCard({ list, onDelete }) {
   );
 }
 
+// YANGI: Admin uchun oylik "tabel" ko'rinishi — barcha ishchilar × kunlar jadvali,
+// bitta ekranda kim qachon (to'liq/yarim/kelmagan/belgilanmagan) ekanini ko'rsatadi.
+function MonthlyTimesheet({ employees, attendance }) {
+  const { t, lang } = useApp();
+  const localeTag = lang === "ru" ? "ru-RU" : lang === "en" ? "en-US" : "uz-UZ";
+  const [monthOffset, setMonthOffset] = useState(0);
+
+  const base = new Date();
+  base.setDate(1);
+  base.setMonth(base.getMonth() + monthOffset);
+  const year = base.getFullYear();
+  const month = base.getMonth();
+  const monthLabel = base.toLocaleDateString(localeTag, { month: "long", year: "numeric" });
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const monthPrefix = `${year}-${String(month + 1).padStart(2, "0")}`;
+  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+
+  function cellInfo(emp, day) {
+    const dateStr = `${monthPrefix}-${String(day).padStart(2, "0")}`;
+    if (dateStr > todayISO()) return { kind: "future" };
+    if (employeeJoinDate(emp) > dateStr) return { kind: "before-join" };
+    const raw = attendance[emp.id]?.[dateStr];
+    if (raw === undefined) return { kind: "unmarked" };
+    return { kind: "marked", v: attEntryStatus(raw) };
+  }
+
+  function cellColor(info) {
+    if (info.kind === "before-join" || info.kind === "future") return "transparent";
+    if (info.kind === "unmarked") return "var(--bad-soft)";
+    if (info.v === 1) return "var(--good)";
+    if (info.v === 0.5) return "var(--warn)";
+    return "var(--bad)";
+  }
+
+  function monthTotal(emp) {
+    let sum = 0;
+    for (const d of days) {
+      const dateStr = `${monthPrefix}-${String(d).padStart(2, "0")}`;
+      const raw = attendance[emp.id]?.[dateStr];
+      if (raw !== undefined) sum += attEntryStatus(raw);
+    }
+    return sum;
+  }
+
+  return (
+    <div className="card rounded-xl p-4">
+      <div className="flex items-center justify-between mb-3">
+        <button type="button" onClick={() => setMonthOffset((o) => o - 1)} className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] field">
+          <ChevronLeft size={15} />
+        </button>
+        <span className="text-[var(--text-primary)] text-sm font-semibold capitalize">{monthLabel}</span>
+        <button type="button" onClick={() => setMonthOffset((o) => Math.min(0, o + 1))} disabled={monthOffset === 0} className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] field disabled:opacity-30">
+          <ChevronRight size={15} />
+        </button>
+      </div>
+
+      {employees.length === 0 ? (
+        <p className="text-[var(--text-muted)] text-sm text-center py-8">{t("noEmployees")}</p>
+      ) : (
+        <div className="overflow-x-auto -mx-4 px-4">
+          <table style={{ borderCollapse: "separate", borderSpacing: "2px" }}>
+            <thead>
+              <tr>
+                <th className="sticky left-0 bg-[var(--bg-card)] text-left text-[10px] text-[var(--text-muted)] font-medium pr-2" style={{ minWidth: 108 }}>
+                  {t("employee")}
+                </th>
+                {days.map((d) => (
+                  <th key={d} className="text-[9px] text-[var(--text-faint)] font-medium" style={{ width: 20 }}>
+                    {d}
+                  </th>
+                ))}
+                <th className="text-[10px] text-[var(--text-muted)] font-medium pl-2" style={{ minWidth: 32 }}>Σ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {employees.map((emp) => (
+                <tr key={emp.id}>
+                  <td className="sticky left-0 bg-[var(--bg-card)] text-[var(--text-primary)] text-xs pr-2 truncate" style={{ maxWidth: 108 }}>
+                    {emp.name}
+                  </td>
+                  {days.map((d) => {
+                    const info = cellInfo(emp, d);
+                    return (
+                      <td key={d} className="p-0">
+                        <div className="rounded-[3px]" style={{ width: 18, height: 18, backgroundColor: cellColor(info) }} />
+                      </td>
+                    );
+                  })}
+                  <td className="text-[var(--text-secondary)] text-[11px] font-mono tabular-nums pl-2">{fmtDays(monthTotal(emp))}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div className="flex items-center gap-3 mt-4 pt-3 border-t border-[var(--border-soft)] flex-wrap">
+        <span className="flex items-center gap-1.5 text-[10px] text-[var(--text-muted)]">
+          <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ backgroundColor: "var(--good)" }} /> {t("fullDay")}
+        </span>
+        <span className="flex items-center gap-1.5 text-[10px] text-[var(--text-muted)]">
+          <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ backgroundColor: "var(--warn)" }} /> {t("halfDay")}
+        </span>
+        <span className="flex items-center gap-1.5 text-[10px] text-[var(--text-muted)]">
+          <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ backgroundColor: "var(--bad)" }} /> {t("absent")}
+        </span>
+        <span className="flex items-center gap-1.5 text-[10px] text-[var(--text-muted)]">
+          <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ backgroundColor: "var(--bad-soft)" }} /> {t("statusNone")}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function AdminApp({
   usersData, currentUser, onLogout, summaryFor,
   adminTab, setAdminTab,
@@ -1980,8 +2093,8 @@ function AdminApp({
   }
 
   const localeTag = lang === "ru" ? "ru-RU" : lang === "en" ? "en-US" : "uz-UZ";
-  function exportReportToExcel() {
-    const rows = myEmployees.map((emp) => {
+  function buildReportRows() {
+    return myEmployees.map((emp) => {
       const s = summaryFor(emp.id);
       return {
         [t("colEmployee")]: emp.name,
@@ -1991,13 +2104,51 @@ function AdminApp({
         [t("colRemaining")]: s.remaining,
       };
     });
-    const ws = XLSX.utils.json_to_sheet(rows);
+  }
+  function buildReportWorkbook() {
+    const ws = XLSX.utils.json_to_sheet(buildReportRows());
     ws["!cols"] = [{ wch: 22 }, { wch: 10 }, { wch: 16 }, { wch: 16 }, { wch: 16 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, t("reportHeader").slice(0, 31));
-    XLSX.writeFile(wb, `hisobot-${todayISO()}.xlsx`);
+    return wb;
+  }
+  function exportReportToExcel() {
+    XLSX.writeFile(buildReportWorkbook(), `hisobot-${todayISO()}.xlsx`);
+  }
+  function buildReportTextSummary() {
+    const lines = myEmployees.map((emp) => {
+      const s = summaryFor(emp.id);
+      return `${emp.name}: ${fmtDays(s.workedDays)} kun · qoldiq ${fmt(s.remaining)}`;
+    });
+    return `${t("reportHeader")} — ${todayISO()}\n\n${lines.join("\n")}`;
+  }
+  // YANGI: "Ulashish" — brauzerning tabiiy ulashish oynasini ochadi (Web Share API).
+  // Shu orqali foydalanuvchi hisobotni Telegram, WhatsApp, Gmail va hokazolarga
+  // to'g'ridan-to'g'ri yubora oladi (fayl sifatida). SMS kabi fayl qabul qilmaydigan
+  // kanallar uchun avtomatik matnli xulosaga tushadi. Agar qurilma/brauzer umuman
+  // ulashishni qo'llab-quvvatlamasa (masalan kompyuter), oddiy Excel yuklab olishga tushadi.
+  async function shareReport() {
+    const wb = buildReportWorkbook();
+    const fileName = `hisobot-${todayISO()}.xlsx`;
+    try {
+      const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+      const blob = new Blob([wbout], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const file = new File([blob], fileName, { type: blob.type });
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: t("reportHeader") });
+        return;
+      }
+      if (navigator.share) {
+        await navigator.share({ title: t("reportHeader"), text: buildReportTextSummary() });
+        return;
+      }
+    } catch (e) {
+      if (e && e.name === "AbortError") return; // foydalanuvchi ulashishni bekor qildi
+    }
+    XLSX.writeFile(wb, fileName);
   }
   const [weekOffset, setWeekOffset] = useState(0);
+  const [attView, setAttView] = useState("daily"); // "daily" | "monthly"
   const [pendingBulk, setPendingBulk] = useState(null); // { status, label } yoki null
   const dateStrip = (() => {
     const today = new Date();
@@ -2174,6 +2325,31 @@ function AdminApp({
 
       {adminTab === "attendance" && (
         <div className="space-y-4">
+          <div className="flex gap-1.5 p-1 rounded-lg field">
+            <button
+              type="button"
+              onClick={() => setAttView("daily")}
+              className="flex-1 py-1.5 rounded-md text-xs font-medium transition-colors"
+              style={attView === "daily" ? { backgroundColor: accent, color: "#12161c" } : { color: "var(--text-secondary)" }}
+            >
+              Kunlik
+            </button>
+            <button
+              type="button"
+              onClick={() => setAttView("monthly")}
+              className="flex-1 py-1.5 rounded-md text-xs font-medium transition-colors"
+              style={attView === "monthly" ? { backgroundColor: accent, color: "#12161c" } : { color: "var(--text-secondary)" }}
+            >
+              Oylik jadval
+            </button>
+          </div>
+
+          {attView === "monthly" && (
+            <MonthlyTimesheet employees={myEmployees} attendance={attendance} />
+          )}
+
+          {attView === "daily" && (
+          <>
           <div className="card rounded-xl p-4">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-1.5 text-[var(--text-primary)] text-sm font-semibold">
@@ -2347,6 +2523,8 @@ function AdminApp({
               </>
             );
           })()}
+          </>
+          )}
         </div>
       )}
 
@@ -2427,14 +2605,23 @@ function AdminApp({
               <ClipboardList size={15} /> {t("reportHeader")}
             </div>
             {myEmployees.length > 0 && (
-              <button
-                type="button"
-                onClick={exportReportToExcel}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-xs font-semibold hover:opacity-90 transition-opacity shrink-0"
-                style={{ background: accentGradient(accent) }}
-              >
-                <Download size={13} /> Excel
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={shareReport}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg field text-[var(--text-secondary)] text-xs font-semibold hover:text-[var(--text-primary)] transition-colors"
+                >
+                  <Share2 size={13} /> Ulashish
+                </button>
+                <button
+                  type="button"
+                  onClick={exportReportToExcel}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-xs font-semibold hover:opacity-90 transition-opacity shrink-0"
+                  style={{ background: accentGradient(accent) }}
+                >
+                  <Download size={13} /> Excel
+                </button>
+              </div>
             )}
           </div>
           <div className="overflow-x-auto">
@@ -2494,7 +2681,7 @@ function AdminApp({
 
 function EmployeeApp({
   currentUser, usersData, summaryFor, onLogout,
-  changeOwnCredentials, updateAvatar, deleteOwnAccount, accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang, linkTelegram,
+  changeOwnCredentials, updateAvatar, deleteOwnAccount, accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang, linkTelegram, enableNotifications,
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [empTab, setEmpTab] = useState("umumiy");
@@ -2597,6 +2784,7 @@ function EmployeeApp({
         fontScale={fontScale} setFontScale={setFontScale}
         lang={lang} setLang={setLang}
         linkTelegram={linkTelegram}
+        enableNotifications={enableNotifications}
       />
       <Shell
         title={t("employeePanel")}
@@ -3307,7 +3495,7 @@ function WorkforceAppInner() {
   }, []);
 
   async function enableNotifications() {
-    if (!currentUser || currentUser.role !== "admin") return;
+    if (!currentUser) return;
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
       alert("Bu qurilma/brauzer bildirishnomani qo'llab-quvvatlamaydi");
       return;
@@ -3415,6 +3603,7 @@ function WorkforceAppInner() {
         fontScale={fontScale} setFontScale={setFontScale}
         lang={lang} setLang={setLang}
         linkTelegram={linkTelegram}
+        enableNotifications={enableNotifications}
       />
     );
   }
