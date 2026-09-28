@@ -1144,31 +1144,53 @@ function Lightbox({ src, name, onClose }) {
   );
 }
 
-// YANGI: "Hisob-kitob qilish" — davrni yopish. Tanlangan sanagacha (shu sana ham kiradi)
-// hisoblangan/to'langan summalar saqlab qo'yiladi va ishchining balansi shu sanadan keyin
-// yangidan boshlanadi. Xohlansa, qoldiq (yoki qarz) keyingi davrga o'tkaziladi.
-function SettlementPanel({ summary: s, previewFor, list, onSettle, onUndo }) {
+function isoOf(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// YANGI: "Oylik hisoblash" — Hisobot bo'limidagi ishchi qatoridan ochiladigan, pastdan
+// chiquvchi ekran. Tanlangan sanagacha (shu sana ham kiradi) hisob ko'rsatiladi va
+// ikkita aniq tugma bor: "To'ladim va yopish" (qoldiq miqdorida ish haqi to'lovi yozadi
+// va hisobni yopadi) yoki "Faqat yopish" (qoldiq/qarz keyingi hisobga o'tadi).
+function SettleSheet({ emp, previewFor, list, onSettle, onUndo, onClose }) {
   const { accent } = useApp();
-  const [open, setOpen] = useState(false);
-  const [date, setDate] = useState(todayISO());
-  const [carry, setCarry] = useState(true);
+  const cur = previewFor(null);
+  const cutoff = cur.cutoff;
+  const today = todayISO();
+
+  const now = new Date();
+  const yest = new Date(now);
+  yest.setDate(now.getDate() - 1);
+  const eomThis = isoOf(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+  const eom = eomThis <= today ? eomThis : isoOf(new Date(now.getFullYear(), now.getMonth(), 0));
+  const chips = [
+    { label: "Bugun", value: today },
+    { label: "Kecha", value: isoOf(yest) },
+    { label: "Oy oxiri", value: eom },
+  ]
+    .filter((c, i, arr) => arr.findIndex((x) => x.value === c.value) === i)
+    .filter((c) => !cutoff || c.value > cutoff);
+
+  const [date, setDate] = useState(chips[0]?.value || today);
+  const [custom, setCustom] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [showHistory, setShowHistory] = useState(false);
   const [confirmUndo, setConfirmUndo] = useState(false);
 
-  const preview = open ? previewFor(date) : null;
-  const invalidDate = !!(s.cutoff && date <= s.cutoff) || date > todayISO();
+  const invalid = date > today || !!(cutoff && date <= cutoff);
+  const preview = previewFor(date);
+  const rem = preview.remaining;
+  const shortDate = (d) => d.slice(5).split("-").reverse().join(".");
 
-  async function submit() {
+  async function run(mode) {
     setBusy(true);
     setError("");
-    const r = await onSettle(date, carry);
+    const r = await onSettle(date, mode);
     setBusy(false);
     if (r && r.error) setError(r.error);
-    else setOpen(false);
+    else onClose();
   }
-
   async function undo() {
     setBusy(true);
     const r = await onUndo();
@@ -1177,137 +1199,164 @@ function SettlementPanel({ summary: s, previewFor, list, onSettle, onUndo }) {
     if (r && r.error) setError(r.error);
   }
 
-  const row = (label, value, tone) => (
-    <div className="flex items-center justify-between text-xs py-1">
+  const line = (label, value, tone) => (
+    <div className="flex items-center justify-between text-sm py-1">
       <span className="text-[var(--text-muted)]">{label}</span>
       <span className={`font-mono tabular-nums font-semibold ${tone === "bad" ? "text-[var(--bad)]" : tone === "good" ? "text-[var(--good)]" : "text-[var(--text-primary)]"}`}>{value}</span>
     </div>
   );
 
   return (
-    <div className="py-3 mt-1 border-t border-[var(--border-soft)]">
-      <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0">
-          <div className="text-[var(--text-primary)] text-xs font-semibold">Hisob-kitob</div>
-          <div className="text-[var(--text-muted)] text-[11px] mt-0.5">
-            {s.cutoff ? `Joriy davr: ${s.cutoff} dan keyin` : "Joriy davr: boshidan"}
-            {s.opening !== 0 ? ` · oldingi qoldiq ${fmt(s.opening)}` : ""}
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end" onClick={onClose}>
+      <div
+        className="w-full bg-[var(--bg-panel)] rounded-t-3xl p-5 pb-8 max-h-[88vh] overflow-y-auto"
+        style={{ animation: "sheetSlideUp 0.25s ease-out" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="w-10 h-1 rounded-full bg-[var(--border-input)] mx-auto mb-4" />
+        <div className="flex items-start justify-between gap-3 mb-1">
+          <div className="min-w-0">
+            <div className="text-[var(--text-primary)] text-base font-semibold truncate">{emp.name}</div>
+            <div className="text-[var(--text-muted)] text-xs mt-0.5">
+              {cutoff ? `Oxirgi hisob: ${cutoff}` : "Hali hisoblanmagan"}
+            </div>
           </div>
+          <button type="button" onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] shrink-0">
+            <X size={18} />
+          </button>
         </div>
-        {!open && (
+
+        <div className="text-[var(--text-secondary)] text-xs font-medium mt-4 mb-2">Qaysi sanagacha hisoblaymiz?</div>
+        {chips.length === 0 && !custom ? (
+          <p className="text-[var(--warn)] text-xs mb-2">Bugun hisoblangan. Yangi kunlar yozilgandan keyin qayta hisoblang.</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {chips.map((c) => {
+              const active = !custom && date === c.value;
+              return (
+                <button
+                  key={c.value}
+                  type="button"
+                  onClick={() => { setCustom(false); setDate(c.value); setError(""); }}
+                  className="px-3.5 py-2 rounded-lg text-xs font-medium leading-tight text-center transition-colors"
+                  style={active ? { backgroundColor: accent, color: "#fff" } : { backgroundColor: "var(--bg-app)", color: "var(--text-secondary)", border: "1px solid var(--border-input)" }}
+                >
+                  {c.label}
+                  <div className="text-[10px] opacity-80 font-mono">{shortDate(c.value)}</div>
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              onClick={() => setCustom(true)}
+              className="px-3.5 py-2 rounded-lg text-xs font-medium transition-colors"
+              style={custom ? { backgroundColor: accent, color: "#fff" } : { backgroundColor: "var(--bg-app)", color: "var(--text-secondary)", border: "1px solid var(--border-input)" }}
+            >
+              Boshqa sana
+            </button>
+          </div>
+        )}
+        {custom && (
+          <div className="mt-3">
+            <Field label="Sana (shu sana ham kiradi)" type="date" value={date} onChange={(v) => { setDate(v); setError(""); }} />
+          </div>
+        )}
+
+        {invalid ? (
+          <p className="text-[var(--warn)] text-xs mt-3">
+            {date > today ? "Kelajak sanasini tanlab bo'lmaydi." : `Oxirgi hisob ${cutoff} da qilingan, undan keyingi sanani tanlang.`}
+          </p>
+        ) : (
+          <div className="card rounded-xl p-4 mt-4">
+            {preview.opening !== 0 && line("Oldingi qoldiq", fmt(preview.opening), preview.opening < 0 ? "bad" : undefined)}
+            {line(`Ishlagan (${fmtDays(preview.workedDays)} kun)`, fmt(preview.totalWage))}
+            {line("Avans / to'langan", `−${fmt(preview.totalAdvance)}`, "bad")}
+            <div className="border-t border-[var(--border-soft)] mt-1.5 pt-2">
+              {line(rem < 0 ? "Qarz" : "To'lash kerak", fmt(Math.abs(rem)), rem < 0 ? "bad" : rem > 0 ? "good" : undefined)}
+            </div>
+          </div>
+        )}
+
+        {!invalid && (
+          <p className="text-[var(--text-muted)] text-xs mt-3 leading-snug">
+            {rem > 0
+              ? `"To'ladim va yopish" bosilsa, ${fmt(rem)} ish haqi to'lovi sifatida yoziladi va hisob yopiladi.`
+              : rem < 0
+                ? `Qarz ${fmt(Math.abs(rem))}. U keyingi hisobga o'tadi.`
+                : "Qoldiq yo'q, hisob yopiladi."}
+          </p>
+        )}
+
+        {error && <p className="text-[var(--bad)] text-xs mt-2">{error}</p>}
+
+        <button
+          type="button"
+          disabled={busy || invalid}
+          onClick={() => run(rem > 0 ? "pay" : "carry")}
+          className="w-full mt-4 py-3 rounded-xl text-white text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
+          style={{ background: accentGradient(accent) }}
+        >
+          {busy ? "..." : rem > 0 ? "To'ladim va yopish" : "Yopish"}
+        </button>
+        {rem > 0 && !invalid && (
           <button
             type="button"
-            onClick={() => { setOpen(true); setDate(todayISO()); setError(""); }}
-            className="px-3 py-1.5 rounded-lg text-white text-xs font-semibold hover:opacity-90 transition-opacity shrink-0"
-            style={{ background: accentGradient(accent) }}
+            disabled={busy}
+            onClick={() => run("carry")}
+            className="w-full mt-2 py-2 text-xs font-medium text-[var(--text-secondary)] disabled:opacity-50"
           >
-            Hisob-kitob qilish
+            Faqat yopish (qoldiq keyingi hisobga o'tsin)
           </button>
         )}
-      </div>
 
-      {open && (
-        <div className="field rounded-lg p-3 mt-2.5 space-y-2.5">
-          <Field label="Shu sanagacha hisob-kitob qilinadi (shu sana ham kiradi)" type="date" value={date} onChange={setDate} />
-          {invalidDate ? (
-            <p className="text-[var(--warn)] text-xs">
-              {date > todayISO() ? "Kelajak sanasini tanlab bo'lmaydi." : `Oxirgi hisob-kitob ${s.cutoff} da qilingan, undan keyingi sanani tanlang.`}
-            </p>
-          ) : preview && (
-            <div className="border-t border-[var(--border-soft)] pt-1.5">
-              {preview.opening !== 0 && row("Oldingi qoldiq", fmt(preview.opening))}
-              {row("Ishlagan kunlar", fmtDays(preview.workedDays))}
-              {row("Hisoblangan", fmt(preview.totalWage))}
-              {row("To'langan", `-${fmt(preview.totalAdvance)}`, "bad")}
-              {row(preview.remaining < 0 ? "Qarz" : "Qoldiq", fmt(Math.abs(preview.remaining)), preview.remaining < 0 ? "bad" : "good")}
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={() => setCarry((v) => !v)}
-            className="w-full flex items-center gap-2 text-left text-xs text-[var(--text-secondary)]"
-          >
-            <span
-              className="w-4 h-4 rounded flex items-center justify-center shrink-0"
-              style={carry ? { backgroundColor: accent, color: "#fff" } : { border: "1px solid var(--border-input)" }}
-            >
-              {carry && <Check size={11} />}
-            </span>
-            Qoldiqni (yoki qarzni) keyingi davrga o'tkazish
-          </button>
-          {!carry && preview && preview.remaining !== 0 && !invalidDate && (
-            <p className="text-[var(--warn)] text-[11px] leading-snug">
-              Diqqat: {fmt(Math.abs(preview.remaining))} {preview.remaining < 0 ? "qarz" : "qoldiq"} hisobdan chiqariladi, yangi davr 0 dan boshlanadi.
-            </p>
-          )}
-          {error && <p className="text-[var(--bad)] text-xs">{error}</p>}
-          <div className="flex gap-2">
+        {list.length > 0 && (
+          <div className="mt-5 pt-3 border-t border-[var(--border-soft)]">
             <button
               type="button"
-              disabled={busy || invalidDate}
-              onClick={submit}
-              className="flex-1 py-2 rounded-lg text-white text-xs font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
-              style={{ background: accentGradient(accent) }}
+              onClick={() => setShowHistory((v) => !v)}
+              className="flex items-center gap-1 text-[var(--text-secondary)] text-xs font-medium"
             >
-              {busy ? "..." : "Hisob-kitobni saqlash"}
+              Oldingi hisoblar ({list.length})
+              <ChevronDown size={13} className={`transition-transform ${showHistory ? "rotate-180" : ""}`} />
             </button>
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="flex-1 py-2 rounded-lg field text-[var(--text-secondary)] text-xs font-medium"
-            >
-              Bekor qilish
-            </button>
+            {showHistory && (
+              <div className="mt-2">
+                {list.slice().reverse().map((x, i) => (
+                  <div key={x.id} className="py-2.5 border-t border-[var(--border-soft)] first:border-t-0">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-[var(--text-primary)] font-semibold">{x.closedThrough} gacha</span>
+                      <span className="text-[var(--text-muted)] font-mono tabular-nums">{fmtDays(x.workedDays)} kun</span>
+                    </div>
+                    <div className="text-[var(--text-muted)] text-[11px] mt-0.5 font-mono tabular-nums">
+                      {fmt(x.totalWage)} − {fmt(x.totalPaid)} = {fmt(x.remaining)}
+                    </div>
+                    {i === 0 && (
+                      !confirmUndo ? (
+                        <button type="button" onClick={() => setConfirmUndo(true)} className="text-[var(--bad)] text-[11px] font-medium mt-1">
+                          Bekor qilish
+                        </button>
+                      ) : (
+                        <div className="mt-1.5">
+                          <p className="text-[var(--bad)] text-[11px] mb-1.5">Shu hisob qayta ochilsinmi? (Yozilgan to'lovlar o'chmaydi)</p>
+                          <div className="flex gap-2">
+                            <button type="button" disabled={busy} onClick={undo} className="px-3 py-1 rounded-md bg-[var(--bad)] text-white text-[11px] font-semibold">Ha</button>
+                            <button type="button" onClick={() => setConfirmUndo(false)} className="px-3 py-1 rounded-md field text-[var(--text-secondary)] text-[11px] font-medium">Yo'q</button>
+                          </div>
+                        </div>
+                      )
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        </div>
-      )}
-
-      {list.length > 0 && (
-        <div className="mt-2.5">
-          <button
-            type="button"
-            onClick={() => setShowHistory((v) => !v)}
-            className="flex items-center gap-1 text-[var(--text-secondary)] text-[11px] font-medium"
-          >
-            Yopilgan davrlar ({list.length})
-            <ChevronDown size={12} className={`transition-transform ${showHistory ? "rotate-180" : ""}`} />
-          </button>
-          {showHistory && (
-            <div className="mt-1.5">
-              {list.slice().reverse().map((x, i) => (
-                <div key={x.id} className="py-2 border-t border-[var(--border-soft)] first:border-t-0">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-[var(--text-primary)] font-semibold">{x.closedThrough} gacha</span>
-                    <span className="text-[var(--text-muted)] font-mono tabular-nums">{fmtDays(x.workedDays)} kun</span>
-                  </div>
-                  <div className="text-[var(--text-muted)] text-[11px] mt-0.5 font-mono tabular-nums">
-                    {fmt(x.totalWage)} − {fmt(x.totalPaid)} = {fmt(x.remaining)}
-                    {x.carryOver === 0 && x.remaining !== 0 ? " (o'tkazilmadi)" : ""}
-                  </div>
-                  {i === 0 && (
-                    !confirmUndo ? (
-                      <button type="button" onClick={() => setConfirmUndo(true)} className="text-[var(--bad)] text-[11px] font-medium mt-1">
-                        Bekor qilish
-                      </button>
-                    ) : (
-                      <div className="flex items-center gap-2 mt-1.5">
-                        <span className="text-[var(--bad)] text-[11px]">Shu hisob-kitob bekor qilinsinmi?</span>
-                        <button type="button" disabled={busy} onClick={undo} className="px-2.5 py-1 rounded-md bg-[var(--bad)] text-white text-[10px] font-semibold">Ha</button>
-                        <button type="button" onClick={() => setConfirmUndo(false)} className="px-2.5 py-1 rounded-md field text-[var(--text-secondary)] text-[10px] font-medium">Yo'q</button>
-                      </div>
-                    )
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
 
-function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage, onResetPassword, previewFor, settlementList, onSettle, onUndoSettle }) {
+function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage, onResetPassword }) {
   const [open, setOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showPhoto, setShowPhoto] = useState(false);
@@ -1457,8 +1506,6 @@ function EmployeeRow({ emp, summary: s, onDelete, onUpdateWage, onResetPassword,
             </div>
           </div>
 
-          <SettlementPanel summary={s} previewFor={previewFor} list={settlementList} onSettle={onSettle} onUndo={onUndoSettle} />
-
           {!confirmDelete ? (
             <button
               type="button"
@@ -1526,7 +1573,7 @@ function AttendanceStatusRow({ emp, status, isFuture, locked, onCycle }) {
         <div className="min-w-0">
           <div className="text-[var(--text-primary)] text-sm font-medium truncate">{emp.name}</div>
           <div className="text-[var(--text-muted)] text-[11px]">
-            {locked ? "Hisob-kitob qilingan davr" : `${fmt(emp.dailyWage)}${t("perDay")}`}
+            {locked ? "Hisoblangan davr" : `${fmt(emp.dailyWage)}${t("perDay")}`}
           </div>
         </div>
       </div>
@@ -2437,6 +2484,7 @@ function AdminApp({
   const [weekOffset, setWeekOffset] = useState(0);
   const [attView, setAttView] = useState("daily"); // "daily" | "monthly"
   const [shareMenuOpen, setShareMenuOpen] = useState(false);
+  const [settleEmpId, setSettleEmpId] = useState(null);
   const [pendingBulk, setPendingBulk] = useState(null); // { status, label } yoki null
   const dateStrip = (() => {
     const today = new Date();
@@ -2503,6 +2551,20 @@ function AdminApp({
         onMarkAllRead={() => markAllNotificationsRead()}
         onMarkRead={markNotificationRead}
       />
+      {settleEmpId && (() => {
+        const emp = myEmployees.find((e) => e.id === settleEmpId);
+        if (!emp) return null;
+        return (
+          <SettleSheet
+            emp={emp}
+            previewFor={(d) => summaryFor(emp.id, d)}
+            list={settlements[emp.id] || []}
+            onSettle={(d, mode) => settleEmployee(emp.id, d, mode)}
+            onUndo={() => undoLastSettlement(emp.id)}
+            onClose={() => setSettleEmpId(null)}
+          />
+        );
+      })()}
       <ShareMenu
         open={shareMenuOpen}
         onClose={() => setShareMenuOpen(false)}
@@ -2612,10 +2674,6 @@ function AdminApp({
                   onDelete={() => deleteEmployee(emp.id)}
                   onUpdateWage={(w) => updateEmployeeWage(emp.id, w)}
                   onResetPassword={(pw) => resetEmployeePassword(emp.id, pw)}
-                  previewFor={(d) => summaryFor(emp.id, d)}
-                  settlementList={settlements[emp.id] || []}
-                  onSettle={(d, carry) => settleEmployee(emp.id, d, carry)}
-                  onUndoSettle={() => undoLastSettlement(emp.id)}
                 />
               ));
             })()}
@@ -2942,7 +3000,17 @@ function AdminApp({
                   const s = summaryFor(emp.id);
                   return (
                     <tr key={emp.id} className="border-t border-[var(--border-soft)]">
-                      <td className="py-2.5 px-5 text-[var(--text-primary)]">{emp.name}</td>
+                      <td className="py-2.5 px-5 text-[var(--text-primary)]">
+                        <div>{emp.name}</div>
+                        <button
+                          type="button"
+                          onClick={() => setSettleEmpId(emp.id)}
+                          className="text-[11px] font-semibold mt-0.5"
+                          style={{ color: accent }}
+                        >
+                          Hisoblash
+                        </button>
+                      </td>
                       <td className="py-2.5 px-3 text-right text-[var(--text-secondary)] font-mono tabular-nums">{fmtDays(s.workedDays)}</td>
                       <td className="py-2.5 px-3 text-right text-[var(--text-secondary)] font-mono tabular-nums">{fmt(s.totalWage)}</td>
                       <td className="py-2.5 px-3 text-right text-[var(--bad)] font-mono tabular-nums">-{fmt(s.totalAdvance)}</td>
@@ -3103,7 +3171,7 @@ function EmployeeApp({
               <AnimatedAmount value={s.remaining} formatter={fmt} className="text-3xl font-bold font-mono tabular-nums text-[var(--good)]" />
               {s.cutoff && (
                 <div className="text-[var(--text-muted)] text-[11px] mt-2">
-                  Oxirgi hisob-kitob: {s.cutoff}{s.opening !== 0 ? ` · oldingi qoldiq ${fmt(s.opening)}` : ""}
+                  Oxirgi hisob: {s.cutoff}{s.opening !== 0 ? ` · oldingi qoldiq ${fmt(s.opening)}` : ""}
                 </div>
               )}
             </div>
@@ -3604,13 +3672,27 @@ function WorkforceAppInner() {
     return list.length ? list[list.length - 1].closedThrough : null;
   }
 
-  async function settleEmployee(empId, closedThrough, carry) {
+  // mode: "pay"  — qoldiq miqdorida "ish haqi to'lovi" yozadi va hisobni yopadi (qoldiq 0);
+  //       "carry" — hisobni yopadi, qoldiq/qarz keyingi hisobga o'tadi.
+  async function settleEmployee(empId, closedThrough, mode) {
     if (!closedThrough) return { error: "Sanani tanlang" };
-    if (closedThrough > todayISO()) return { error: "Kelajak sanasi uchun hisob-kitob qilib bo'lmaydi" };
+    if (closedThrough > todayISO()) return { error: "Kelajak sanasi uchun hisoblab bo'lmaydi" };
     const sm = summaryFor(empId, closedThrough);
     if (!sm) return { error: "Ishchi topilmadi" };
     if (sm.cutoff && closedThrough <= sm.cutoff) {
-      return { error: `Oxirgi hisob-kitob ${sm.cutoff} sanasida qilingan. Undan keyingi sanani tanlang.` };
+      return { error: `Oxirgi hisob ${sm.cutoff} sanasida qilingan. Undan keyingi sanani tanlang.` };
+    }
+    let paid = sm.totalAdvance;
+    let remaining = sm.remaining;
+    let newAdvance = null;
+    if (mode === "pay" && sm.remaining > 0) {
+      const { data: adv, error: advErr } = await supabase.from("advances").insert({
+        employee_id: empId, amount: sm.remaining, date: closedThrough, note: "Oylik hisoblash", type: "salary",
+      }).select().single();
+      if (advErr) return { error: advErr.message };
+      newAdvance = adv;
+      paid += sm.remaining;
+      remaining = 0;
     }
     const { data, error } = await supabase.from("settlements").insert({
       employee_id: empId,
@@ -3618,11 +3700,21 @@ function WorkforceAppInner() {
       opening_balance: sm.opening,
       worked_days: sm.workedDays,
       total_wage: sm.totalWage,
-      total_paid: sm.totalAdvance,
-      remaining: sm.remaining,
-      carry_over: carry ? sm.remaining : 0,
+      total_paid: paid,
+      remaining,
+      carry_over: remaining,
     }).select().single();
-    if (error) return { error: error.message };
+    if (error) {
+      // hisob yopilmadi — yozilgan to'lovni ham qaytarib olamiz, ma'lumot chala qolmasin
+      if (newAdvance) await supabase.from("advances").delete().eq("id", newAdvance.id);
+      return { error: error.message };
+    }
+    if (newAdvance) {
+      setAdvances((prev) => ({
+        ...prev,
+        [empId]: [...(prev[empId] || []), { id: newAdvance.id, amount: Number(newAdvance.amount), date: newAdvance.date, note: newAdvance.note, type: newAdvance.type }],
+      }));
+    }
     setSettlements((prev) => ({ ...prev, [empId]: [...(prev[empId] || []), mapSettlementRow(data)] }));
     return {};
   }
@@ -3748,7 +3840,7 @@ function WorkforceAppInner() {
     if (!advEmp || !advForm.amount || !Number.isFinite(amountNum) || amountNum <= 0) return;
     const lockedUntil = cutoffFor(advEmp);
     if (lockedUntil && advForm.date <= lockedUntil) {
-      alert(`Bu sana hisob-kitob qilingan davrga kiradi (${lockedUntil} gacha). Undan keyingi sanani tanlang.`);
+      alert(`Bu sana hisoblangan davrga kiradi (${lockedUntil} gacha). Undan keyingi sanani tanlang.`);
       return;
     }
     const { data, error } = await supabase.from("advances").insert({
