@@ -4,7 +4,7 @@ import {
   XCircle, Eye, EyeOff, UserPlus, ShieldCheck, ClipboardList, TrendingDown,
   MoreVertical, Copy, Check, CheckCheck, KeyRound, Settings, Lock, X, Palette, Type,
   Camera, Globe, User as UserIcon, ChevronDown, Sun, Moon, ChevronLeft, ChevronRight,
-  Menu, ChevronUp, UserX, ArrowLeft, Paintbrush, Download, Send, Bell, Search, LayoutDashboard, Home, Share2, MessageCircle, Mail
+  Menu, ChevronUp, UserX, ArrowLeft, Paintbrush, Download, Send, Bell, Search, LayoutDashboard, Home, Share2
 } from "lucide-react";
 import { supabase } from "./lib/supabase";
 import * as XLSX from "xlsx";
@@ -2055,8 +2055,57 @@ function MonthlyTimesheet({ employees, attendance }) {
 // holatda o'zimizning kafolatlangan ulashish varag'imiz chiqadi: Telegram va
 // WhatsApp'ga matnli xulosa bilan to'g'ridan-to'g'ri o'tish, Email orqali yuborish,
 // yoki Excel faylini yuklab olish (keyin istalgan ilovaga qo'lda biriktirish mumkin).
+function BrandIcon({ kind, size = 52 }) {
+  const common = { width: size, height: size, viewBox: "0 0 48 48", "aria-hidden": true };
+  if (kind === "telegram") {
+    return (
+      <svg {...common}>
+        <rect width="48" height="48" rx="13" fill="#2AABEE" />
+        <path d="M10.5 23.6 34.6 14.3c1.1-.4 2.1.3 1.7 1.9l-4.1 19.3c-.3 1.4-1.1 1.7-2.3 1.1l-6.3-4.6-3 2.9c-.3.3-.6.6-1.3.6l.5-6.4 11.7-10.6c.5-.5-.1-.7-.8-.3L14.9 27.5l-6.2-1.9c-1.3-.4-1.4-1.3.3-2z" fill="#fff" />
+      </svg>
+    );
+  }
+  if (kind === "whatsapp") {
+    return (
+      <svg {...common}>
+        <rect width="48" height="48" rx="13" fill="#25D366" />
+        <path d="M24 11.5a12.5 12.5 0 0 0-10.7 19l-1.6 6 6.2-1.6A12.5 12.5 0 1 0 24 11.5z" fill="none" stroke="#fff" strokeWidth="2.6" strokeLinejoin="round" />
+        <path d="M19.4 18.2c.4-.9.9-.9 1.3-.9h.9c.3 0 .6.1.8.6l1.2 2.8c.1.3.1.6-.1.8l-.8 1c-.2.2-.2.5 0 .8.9 1.5 2.4 2.8 4.1 3.5.3.1.6.1.8-.1l1-1.2c.2-.3.5-.3.8-.2l2.6 1.2c.4.2.5.4.5.7 0 1.1-.9 2.3-2.2 2.6-1.4.4-3.4.1-6-1.4-2.4-1.4-4.2-3.5-5.3-5.6-.9-1.8-.9-3.4 0-4.9z" fill="#fff" />
+      </svg>
+    );
+  }
+  if (kind === "email") {
+    return (
+      <svg {...common}>
+        <rect x="0.75" y="0.75" width="46.5" height="46.5" rx="12.5" fill="#fff" stroke="#dadce0" strokeWidth="1.5" />
+        <rect x="11" y="15" width="4" height="18" fill="#4285F4" />
+        <rect x="33" y="15" width="4" height="18" fill="#34A853" />
+        <path d="M11 16.5 24 26.5 37 16.5" fill="none" stroke="#EA4335" strokeWidth="4" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  // excel
+  return (
+    <svg {...common}>
+      <rect width="48" height="48" rx="13" fill="#107C41" />
+      <rect x="27" y="12" width="11" height="24" rx="2" fill="#fff" opacity="0.25" />
+      <path d="M14 15.5 26 32.5M26 15.5 14 32.5" stroke="#fff" strokeWidth="5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+// YANGI: Ba'zi qurilma/brauzerlarda tizimning umumiy ulashish oynasi (Web Share API)
+// ishlamaydi yoki mavjud emas — bunday holatda o'zimizning ulashish varag'imiz chiqadi:
+// Telegram va WhatsApp'ga matnli xulosa bilan o'tish, Email orqali yuborish,
+// yoki Excel faylini yuklab olish.
 function ShareMenu({ open, onClose, onTelegram, onWhatsapp, onEmail, onExcel }) {
   if (!open) return null;
+  const items = [
+    { kind: "telegram", label: "Telegram", onClick: onTelegram },
+    { kind: "whatsapp", label: "WhatsApp", onClick: onWhatsapp },
+    { kind: "email", label: "Gmail / Email", onClick: onEmail },
+    { kind: "excel", label: "Excel", onClick: onExcel },
+  ];
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end" onClick={onClose}>
       <div
@@ -2065,32 +2114,14 @@ function ShareMenu({ open, onClose, onTelegram, onWhatsapp, onEmail, onExcel }) 
         onClick={(e) => e.stopPropagation()}
       >
         <div className="w-10 h-1 rounded-full bg-[var(--border-input)] mx-auto mb-4" />
-        <div className="text-[var(--text-primary)] text-sm font-semibold mb-4 text-center">Ulashish</div>
-        <div className="grid grid-cols-4 gap-3">
-          <button type="button" onClick={onTelegram} className="flex flex-col items-center gap-1.5">
-            <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: "#2aa9de" }}>
-              <Send size={20} className="text-white" />
-            </div>
-            <span className="text-[10px] text-[var(--text-secondary)]">Telegram</span>
-          </button>
-          <button type="button" onClick={onWhatsapp} className="flex flex-col items-center gap-1.5">
-            <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: "#25D366" }}>
-              <MessageCircle size={20} className="text-white" />
-            </div>
-            <span className="text-[10px] text-[var(--text-secondary)]">WhatsApp</span>
-          </button>
-          <button type="button" onClick={onEmail} className="flex flex-col items-center gap-1.5">
-            <div className="w-12 h-12 rounded-full flex items-center justify-center bg-[var(--bg-app)] border border-[var(--border-input)]">
-              <Mail size={20} className="text-[var(--text-secondary)]" />
-            </div>
-            <span className="text-[10px] text-[var(--text-secondary)]">Email</span>
-          </button>
-          <button type="button" onClick={onExcel} className="flex flex-col items-center gap-1.5">
-            <div className="w-12 h-12 rounded-full flex items-center justify-center bg-[var(--bg-app)] border border-[var(--border-input)]">
-              <Download size={20} className="text-[var(--text-secondary)]" />
-            </div>
-            <span className="text-[10px] text-[var(--text-secondary)]">Excel</span>
-          </button>
+        <div className="text-[var(--text-primary)] text-sm font-semibold mb-5 text-center">Ulashish</div>
+        <div className="grid grid-cols-4 gap-3 max-w-sm mx-auto">
+          {items.map((it) => (
+            <button key={it.kind} type="button" onClick={it.onClick} className="flex flex-col items-center gap-2 active:scale-95 transition-transform">
+              <BrandIcon kind={it.kind} />
+              <span className="text-[10px] text-[var(--text-secondary)] text-center leading-tight">{it.label}</span>
+            </button>
+          ))}
         </div>
       </div>
     </div>
