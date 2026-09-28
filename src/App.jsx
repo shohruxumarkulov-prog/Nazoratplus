@@ -1903,16 +1903,16 @@ function AdvanceHistoryCard({ list, onDelete }) {
         </div>
       )}
 
-      <div className="space-y-2">
-        {groups.map((g) => {
+      <div>
+        {groups.map((g, idx) => {
           const isOpen = openKey === g.key;
           const groupTotal = g.items.reduce((sum, a) => sum + Number(a.amount), 0);
           return (
-            <div key={g.key} className="rounded-lg overflow-hidden field">
+            <div key={g.key} className={idx > 0 ? "border-t border-[var(--border-soft)]" : ""}>
               <button
                 type="button"
                 onClick={() => setOpenKey(isOpen ? null : g.key)}
-                className="w-full flex items-center justify-between px-3.5 py-2.5"
+                className="w-full flex items-center justify-between py-2.5"
               >
                 <span className="text-[var(--text-primary)] text-xs font-semibold capitalize">{monthLabel(g.key)}</span>
                 <div className="flex items-center gap-2">
@@ -1921,7 +1921,7 @@ function AdvanceHistoryCard({ list, onDelete }) {
                 </div>
               </button>
               {isOpen && (
-                <div className="px-3.5 pb-1 bg-[var(--bg-card)]">
+                <div className="pb-1">
                   {g.items.map((a) => (
                     <AdvanceHistoryRow key={a.id} a={a} t={t} onDelete={() => onDelete(a.id)} />
                   ))}
@@ -2204,11 +2204,13 @@ function AdminApp({
   }
 
   function shareViaTelegram() {
-    window.open(`https://t.me/share/url?url=&text=${encodeURIComponent(buildReportTextSummary())}`, "_blank");
+    // t.me havolasi bu muhitda Telegram veb-saytini ochib yuborardi; tg:// esa
+    // to'g'ridan-to'g'ri o'rnatilgan Telegram ilovasini ochadi.
+    window.location.href = `tg://msg?text=${encodeURIComponent(buildReportTextSummary())}`;
     setShareMenuOpen(false);
   }
   function shareViaWhatsapp() {
-    window.open(`https://wa.me/?text=${encodeURIComponent(buildReportTextSummary())}`, "_blank");
+    window.location.href = `https://wa.me/?text=${encodeURIComponent(buildReportTextSummary())}`;
     setShareMenuOpen(false);
   }
   function shareViaEmail() {
