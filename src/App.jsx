@@ -3051,8 +3051,11 @@ function AdminApp({
 function EmployeeApp({
   currentUser, usersData, summaryFor, onLogout,
   changeOwnCredentials, updateAvatar, deleteOwnAccount, accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang, linkTelegram, enableNotifications,
+  notifications, markAllNotificationsRead, markNotificationRead,
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const unreadCount = notifications.filter((n) => !n.is_read).length;
   const [empTab, setEmpTab] = useState("umumiy");
   const [attMonthOffset, setAttMonthOffset] = useState(0);
   const [advMonthKey, setAdvMonthKey] = useState(todayISO().slice(0, 7));
@@ -3155,12 +3158,34 @@ function EmployeeApp({
         linkTelegram={linkTelegram}
         enableNotifications={enableNotifications}
       />
+      <NotificationPanel
+        open={notifOpen}
+        onClose={() => setNotifOpen(false)}
+        notifications={notifications}
+        onMarkAllRead={() => markAllNotificationsRead()}
+        onMarkRead={markNotificationRead}
+      />
       <Shell
         title={t("employeePanel")}
         userName={currentUser.name}
         avatar={s.emp.avatar || null}
         onTitleClick={() => setDrawerOpen(true)}
         bottomNav={empBottomNav}
+        headerRight={
+          <button
+            type="button"
+            onClick={() => setNotifOpen(true)}
+            className="w-9 h-9 rounded-full flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--bg-card)] transition-colors shrink-0 relative"
+            aria-label={t("notifications")}
+          >
+            <Bell size={18} />
+            {unreadCount > 0 && (
+              <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-[var(--bad)] text-white text-[9px] font-bold flex items-center justify-center">
+                {unreadCount}
+              </span>
+            )}
+          </button>
+        }
       >
         {empTab === "umumiy" && (
           <div className="tab-transition space-y-3">
@@ -3483,6 +3508,7 @@ function WorkforceAppInner() {
       setAdvances({ [myProfile.id]: advList });
       const { data: mySetRows } = await supabase.from("settlements").select("*").eq("employee_id", myProfile.id).order("closed_through", { ascending: true });
       setSettlements({ [myProfile.id]: (mySetRows || []).map(mapSettlementRow) });
+      await loadNotifications(myProfile.id);
       setCurrentUserState({ role: "employee", id: myProfile.id, name: emp.name, owner: emp.owner });
     }
     setLoading(false);
@@ -3526,7 +3552,7 @@ function WorkforceAppInner() {
   // bitta yuklash yetarli, realtime esa olib tashlandi.
 
   useEffect(() => {
-    if (!currentUser || currentUser.role !== "admin") return;
+    if (!currentUser) return;
     const channel = supabase
       .channel(`notif_${currentUser.id}`)
       .on(
@@ -3549,13 +3575,13 @@ function WorkforceAppInner() {
   }
 
   async function markAllNotificationsRead() {
-    if (!currentUser || currentUser.role !== "admin") return;
+    if (!currentUser) return;
     await supabase.from("notifications").update({ is_read: true }).eq("admin_id", currentUser.id).eq("is_read", false);
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
   }
 
   async function markNotificationRead(id) {
-    if (!currentUser || currentUser.role !== "admin") return;
+    if (!currentUser) return;
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
     await supabase.from("notifications").update({ is_read: true }).eq("id", id);
   }
@@ -4075,6 +4101,9 @@ function WorkforceAppInner() {
         lang={lang} setLang={setLang}
         linkTelegram={linkTelegram}
         enableNotifications={enableNotifications}
+        notifications={notifications}
+        markAllNotificationsRead={markAllNotificationsRead}
+        markNotificationRead={markNotificationRead}
       />
     );
   }
