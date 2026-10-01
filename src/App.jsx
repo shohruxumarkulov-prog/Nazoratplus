@@ -1700,7 +1700,7 @@ function NotificationPanel({ open, onClose, notifications, onMarkAllRead, onMark
 }
 
 function ProfileDrawer({
-  open, onClose, me, roleLabel, isAdmin, onDeleteAccount, onLogout,
+  open, onClose, me, roleLabel, isAdmin, onDeleteAccount, onLogout, onExportBackup,
   changeOwnCredentials, updateAvatar, enableNotifications, linkTelegram,
   accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang,
 }) {
@@ -1983,6 +1983,20 @@ function ProfileDrawer({
 
         {page === "advanced" && (
           <div className="px-5 pt-5 pb-8">
+            {isAdmin && onExportBackup && (
+              <>
+                <button
+                  type="button"
+                  onClick={onExportBackup}
+                  className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg field text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors"
+                >
+                  <Download size={14} /> Zaxira nusxa olish (JSON)
+                </button>
+                <p className="text-[var(--text-faint)] text-[11px] mt-1.5 mb-5 leading-snug">
+                  Barcha ishchilar, davomat, avanslar va hisob-kitoblar bitta faylga saqlanadi.
+                </p>
+              </>
+            )}
             {!confirmDeleteAcc ? (
               <button
                 type="button"
@@ -2364,7 +2378,7 @@ function AdminApp({
   advances, advEmp, setAdvEmp, advForm, setAdvForm, addAdvance, deleteAdvance,
   changeOwnCredentials, updateAvatar, deleteOwnAccount, accent, setAccent, mode, setMode, fontScale, setFontScale, lang, setLang, enableNotifications,
   notifications, markAllNotificationsRead, markNotificationRead, linkTelegram,
-  settleEmployee, undoLastSettlement, settlements,
+  settleEmployee, undoLastSettlement, settlements, exportBackup,
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -2534,6 +2548,7 @@ function AdminApp({
         roleLabel={t("adminPanel")}
         isAdmin={true}
         onDeleteAccount={deleteOwnAccount}
+        onExportBackup={exportBackup}
         onLogout={onLogout}
         changeOwnCredentials={changeOwnCredentials}
         updateAvatar={updateAvatar}
@@ -3388,6 +3403,28 @@ function WorkforceAppInner() {
   const [telegramPromptPhase, setTelegramPromptPhase] = useState("prompt"); // prompt | waiting | success
   const [telegramLinkBusy, setTelegramLinkBusy] = useState(false);
   const telegramPollRef = useRef(null);
+  const [isOnline, setIsOnline] = useState(() => (typeof navigator !== "undefined" ? navigator.onLine : true));
+  const [retrying, setRetrying] = useState(false);
+
+  useEffect(() => {
+    function goOnline() { setIsOnline(true); }
+    function goOffline() { setIsOnline(false); }
+    window.addEventListener("online", goOnline);
+    window.addEventListener("offline", goOffline);
+    return () => {
+      window.removeEventListener("online", goOnline);
+      window.removeEventListener("offline", goOffline);
+    };
+  }, []);
+
+  async function retryConnection() {
+    setRetrying(true);
+    setIsOnline(navigator.onLine);
+    if (navigator.onLine && session) {
+      try { await loadAllData(session.user); } catch (e) {}
+    }
+    setRetrying(false);
+  }
 
   function setCurrentUser(user) {
     setCurrentUserState(user);
@@ -3590,6 +3627,11 @@ function WorkforceAppInner() {
   // LOGIN / RO'YXATDAN O'TISH
   // ============================================================================
 
+  function formatLockMessage(secondsLeft) {
+    const mins = Math.ceil(secondsLeft / 60);
+    return `Juda ko'p noto'g'ri urinish. ${mins} daqiqadan keyin qayta urining.`;
+  }
+
   async function handleLogin() {
     setLoginError("");
     const username = loginForm.username.trim();
@@ -3600,18 +3642,31 @@ function WorkforceAppInner() {
     }
     setLoginBusy(true);
     try {
+      // YANGI: urinishdan oldin shu login vaqtincha bloklanmaganini tekshiramiz.
+      const { data: lockData } = await supabase.rpc("check_login_lock", { p_username: username });
+      const lock = Array.isArray(lockData) ? lockData[0] : lockData;
+      if (lock && lock.locked) {
+        setLoginError(formatLockMessage(lock.seconds_left));
+        setLoginBusy(false);
+        return;
+      }
       const { data: email, error: lookupErr } = await supabase.rpc("email_for_username", { p_username: username });
       if (lookupErr || !email) {
-        setLoginError(makeT(lang)("wrongLogin"));
+        const { data: failData } = await supabase.rpc("record_login_failure", { p_username: username });
+        const fail = Array.isArray(failData) ? failData[0] : failData;
+        setLoginError(fail && fail.locked ? formatLockMessage(fail.seconds_left) : makeT(lang)("wrongLogin"));
         setLoginBusy(false);
         return;
       }
       const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
       if (signInErr || !signInData?.session) {
-        setLoginError(makeT(lang)("wrongLogin"));
+        const { data: failData } = await supabase.rpc("record_login_failure", { p_username: username });
+        const fail = Array.isArray(failData) ? failData[0] : failData;
+        setLoginError(fail && fail.locked ? formatLockMessage(fail.seconds_left) : makeT(lang)("wrongLogin"));
         setLoginBusy(false);
         return;
       }
+      await supabase.rpc("record_login_success", { p_username: username });
       try {
         if (rememberMe) {
           localStorage.setItem("nazorat_remembered_username", username);
@@ -3886,6 +3941,29 @@ function WorkforceAppInner() {
     await supabase.from("advances").delete().eq("id", advId);
   }
 
+  // YANGI: barcha biznes ma'lumotini (ishchilar, davomat, avanslar, hisob-kitoblar)
+  // bitta JSON faylga saqlab, qurilmaga yuklab beradi. Hech narsa serverga yuborilmaydi —
+  // faqat allaqachon ilovada yuklangan ma'lumot faylga aylantiriladi.
+  function exportBackup() {
+    const backup = {
+      exportedAt: new Date().toISOString(),
+      admin: currentUser?.username || null,
+      employees: usersData?.employees || [],
+      attendance,
+      advances,
+      settlements,
+    };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `nazorat-zaxira-${todayISO()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
   // ============================================================================
   // PROFIL / XAVFSIZLIK
   // ============================================================================
@@ -4083,6 +4161,7 @@ function WorkforceAppInner() {
         settleEmployee={settleEmployee}
         undoLastSettlement={undoLastSettlement}
         settlements={settlements}
+        exportBackup={exportBackup}
       />
     );
   } else {
@@ -4110,6 +4189,14 @@ function WorkforceAppInner() {
 
   return (
     <AppContext.Provider value={{ accent, lang, t }}>
+      {!isOnline && (
+        <div className="sticky top-0 z-[70] bg-[var(--bad)] text-white text-xs font-medium flex items-center justify-center gap-3 py-2 px-4 flex-wrap text-center">
+          <span>Internet aloqasi yo'q</span>
+          <button type="button" onClick={retryConnection} disabled={retrying} className="underline font-semibold disabled:opacity-60">
+            {retrying ? "Tekshirilmoqda..." : "Qayta urinish"}
+          </button>
+        </div>
+      )}
       <div
         className="font-sans"
         style={{
