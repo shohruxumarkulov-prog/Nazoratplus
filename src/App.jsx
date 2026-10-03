@@ -407,15 +407,16 @@ function Field({ label, value, onChange, type = "text" }) {
 
 // YANGI: rasmga o'xshab, dumaloq (pill) ko'rinishdagi, ichida ikonka bo'lgan input.
 // Login ekranida foydalaniladi — label yo'q, o'rniga placeholder ishlatiladi.
-function IconInput({ icon, type = "text", value, onChange, placeholder, onKeyDown, autoFocus, showToggle, toggleIcon, onToggle }) {
+function IconInput({ icon, type = "text", value, onChange, placeholder, onKeyDown, autoFocus, showToggle, toggleIcon, onToggle, error, disabled, shakeKey }) {
   const [focused, setFocused] = useState(false);
   const baseShadow = "inset -6px -6px 10px rgba(255,255,255,0.95), inset 6px 6px 10px rgba(184,190,204,0.45)";
   const focusShadow = "inset 3px 3px 6px rgba(20,60,140,0.35), inset -3px -3px 6px rgba(70,130,220,0.25)";
+  const errorShadow = "inset 3px 3px 6px rgba(209,69,59,0.4), inset -3px -3px 6px rgba(220,100,90,0.3)";
   return (
-    <div className="relative">
+    <div key={shakeKey} className={`relative ${error ? "shake-anim" : ""}`}>
       <span
         className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-300"
-        style={{ color: focused ? "#1a56b0" : "#909090" }}
+        style={{ color: error ? "#a10f0f" : focused ? "#1a56b0" : "#909090" }}
       >
         {icon}
       </span>
@@ -426,10 +427,11 @@ function IconInput({ icon, type = "text", value, onChange, placeholder, onKeyDow
         onKeyDown={onKeyDown}
         placeholder={placeholder}
         autoFocus={autoFocus}
+        disabled={disabled}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
-        className={`w-full pl-11 ${showToggle ? "pr-11" : "pr-4"} py-3.5 rounded-2xl bg-[#e8e8e8] text-[#4a4a4a] text-sm font-medium outline-none border-none transition-all duration-300 placeholder:text-[#a3a3a3]`}
-        style={{ boxShadow: focused ? focusShadow : baseShadow, transform: focused ? "translateY(-2px)" : "translateY(0)" }}
+        className={`w-full pl-11 ${showToggle ? "pr-11" : "pr-4"} py-3.5 rounded-2xl bg-[#e8e8e8] text-[#4a4a4a] text-sm font-medium outline-none border-none transition-all duration-300 placeholder:text-[#a3a3a3] disabled:opacity-60`}
+        style={{ boxShadow: error ? errorShadow : focused ? focusShadow : baseShadow, transform: focused ? "translateY(-2px)" : "translateY(0)" }}
       />
       {showToggle && (
         <button
@@ -827,7 +829,7 @@ function UsernameCheckField({ value, onChange, onStatusChange, active }) {
   );
 }
 
-function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister, loginBusy, rememberMe, setRememberMe }) {
+function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister, loginBusy, rememberMe, setRememberMe, lockSeconds, lockTick, loginErrorTick }) {
   const [showPassword, setShowPassword] = useState(false);
   const [registering, setRegistering] = useState(false);
   const [regStep, setRegStep] = useState("username"); // "username" | "password"
@@ -839,7 +841,47 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
   const [showForgotHint, setShowForgotHint] = useState(false);
   const [forgotMode, setForgotMode] = useState(null); // null | 'choose' | 'employee' | 'admin'
   const [btnHover, setBtnHover] = useState(false);
+  const [countdown, setCountdown] = useState(0);
+  const [fieldError, setFieldError] = useState(false);
+  const [shakeNonce, setShakeNonce] = useState(0);
+  const countdownRef = useRef(null);
   const { t } = useApp();
+
+  // YANGI: admin tomondan "bloklandi" signali kelganda (lockTick o'zgarganda) —
+  // soniyama-soniya pastga tushadigan sanoqni boshlaymiz va maydonlarni qizil
+  // qilib, titratib qo'yamiz.
+  useEffect(() => {
+    if (!lockTick) return;
+    setCountdown(lockSeconds);
+    setFieldError(true);
+    setShakeNonce((n) => n + 1);
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    countdownRef.current = setInterval(() => {
+      setCountdown((c) => {
+        if (c <= 1) {
+          clearInterval(countdownRef.current);
+          countdownRef.current = null;
+          setFieldError(false);
+          return 0;
+        }
+        return c - 1;
+      });
+    }, 1000);
+    return () => { if (countdownRef.current) clearInterval(countdownRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lockTick]);
+
+  // Oddiy xato (bloklanish emas) — maydonlarni qisqa muddat qizil/titroq qilamiz.
+  useEffect(() => {
+    if (!loginErrorTick) return;
+    setFieldError(true);
+    setShakeNonce((n) => n + 1);
+    const h = setTimeout(() => setFieldError(false), 2200);
+    return () => clearTimeout(h);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loginErrorTick]);
+
+  const locked = countdown > 0;
 
   async function submitRegister() {
     setRegError("");
@@ -917,21 +959,27 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
               <IconInput
                 icon={<UserIcon size={17} />}
                 value={loginForm.username}
-                onChange={(v) => setLoginForm({ ...loginForm, username: v })}
+                onChange={(v) => { setLoginForm({ ...loginForm, username: v }); setFieldError(false); }}
                 onKeyDown={(e) => { if (e.key === "Enter") onSubmit(); }}
                 placeholder={t("login")}
                 autoFocus={!registering}
+                disabled={locked}
+                error={fieldError}
+                shakeKey={shakeNonce}
               />
               <IconInput
                 icon={<Lock size={17} />}
                 type={showPassword ? "text" : "password"}
                 value={loginForm.password}
-                onChange={(v) => setLoginForm({ ...loginForm, password: v })}
+                onChange={(v) => { setLoginForm({ ...loginForm, password: v }); setFieldError(false); }}
                 onKeyDown={(e) => { if (e.key === "Enter") onSubmit(); }}
                 placeholder={t("password")}
                 showToggle
                 toggleIcon={showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 onToggle={() => setShowPassword((v) => !v)}
+                disabled={locked}
+                error={fieldError}
+                shakeKey={shakeNonce}
               />
             </div>
 
@@ -950,11 +998,15 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
               </button>
             </div>
 
-            {loginError && <p className="text-xs mt-3 text-center" style={{ color: "#a10f0f" }}>{loginError}</p>}
+            {(loginError || locked) && (
+              <p className="text-xs mt-3 text-center font-medium" style={{ color: "#a10f0f" }}>
+                {locked ? `Juda ko'p noto'g'ri urinish. ${countdown} soniyadan keyin qayta urining.` : loginError}
+              </p>
+            )}
 
             <button
               type="button"
-              disabled={loginBusy}
+              disabled={loginBusy || locked}
               onClick={() => onSubmit()}
               onMouseEnter={() => setBtnHover(true)}
               onMouseLeave={() => setBtnHover(false)}
@@ -966,7 +1018,7 @@ function LoginScreen({ loginForm, setLoginForm, loginError, onSubmit, onRegister
                 transform: btnHover ? "translateY(-2px)" : "translateY(0)",
               }}
             >
-              {loginBusy ? t("loading") : t("loginBtn")}
+              {locked ? `${countdown}s` : loginBusy ? t("loading") : t("loginBtn")}
             </button>
 
             <p className="text-center text-xs mt-5" style={{ color: "#9a9a9a" }}>
@@ -1699,6 +1751,84 @@ function NotificationPanel({ open, onClose, notifications, onMarkAllRead, onMark
   );
 }
 
+// YANGI: ma'lumotlarni yuklab olish — Instagram'dagi "Download your information"
+// ekraniga o'xshab, nima yuklanishini ro'yxat qilib ko'rsatadi, "Tayyorlanmoqda..."
+// bosqichidan o'tadi, so'ng muvaffaqiyatli yakunlanganini bildiradi.
+function DataExportSheet({ open, onClose, onExport }) {
+  const { accent } = useApp();
+  const [phase, setPhase] = useState("idle"); // idle | preparing | done
+
+  useEffect(() => {
+    if (!open) setPhase("idle");
+  }, [open]);
+
+  async function start() {
+    setPhase("preparing");
+    await new Promise((r) => setTimeout(r, 900));
+    onExport();
+    setPhase("done");
+    setTimeout(() => onClose(), 1400);
+  }
+
+  if (!open) return null;
+  const items = [
+    { icon: <Users size={16} />, label: "Ishchilar" },
+    { icon: <Calendar size={16} />, label: "Davomat" },
+    { icon: <Wallet size={16} />, label: "Avanslar" },
+    { icon: <ClipboardList size={16} />, label: "Hisob-kitoblar" },
+  ];
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end" onClick={phase === "idle" ? onClose : undefined}>
+      <div
+        className="w-full bg-[var(--bg-panel)] rounded-t-3xl p-5 pb-8"
+        style={{ animation: "sheetSlideUp 0.25s ease-out" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="w-10 h-1 rounded-full bg-[var(--border-input)] mx-auto mb-4" />
+        {phase === "done" ? (
+          <div className="flex flex-col items-center gap-3 py-6 text-center">
+            <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ backgroundColor: "var(--good-soft)" }}>
+              <Check size={28} style={{ color: "var(--good)" }} />
+            </div>
+            <div className="text-[var(--text-primary)] font-semibold text-base">Fayl tayyor</div>
+            <p className="text-[var(--text-secondary)] text-xs">Ma'lumotlar yuklab olindi.</p>
+          </div>
+        ) : (
+          <>
+            <div className="text-[var(--text-primary)] text-base font-semibold text-center mb-1">Ma'lumotlarni yuklab olish</div>
+            <p className="text-[var(--text-muted)] text-xs text-center mb-5 leading-snug">
+              Quyidagilarning barchasi bitta faylga saqlanadi:
+            </p>
+            <div className="space-y-2 mb-5">
+              {items.map((it) => (
+                <div key={it.label} className="flex items-center gap-3 field rounded-lg px-3.5 py-2.5">
+                  <span style={{ color: accent }}>{it.icon}</span>
+                  <span className="text-[var(--text-primary)] text-sm">{it.label}</span>
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              disabled={phase === "preparing"}
+              onClick={start}
+              className="w-full py-3 rounded-xl text-white text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-70"
+              style={{ background: accentGradient(accent) }}
+            >
+              {phase === "preparing" ? "Tayyorlanmoqda..." : "Yuklab olish"}
+            </button>
+            {phase === "idle" && (
+              <button type="button" onClick={onClose} className="w-full mt-2 py-2 text-xs font-medium text-[var(--text-secondary)]">
+                Bekor qilish
+              </button>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ProfileDrawer({
   open, onClose, me, roleLabel, isAdmin, onDeleteAccount, onLogout, onExportBackup,
   changeOwnCredentials, updateAvatar, enableNotifications, linkTelegram,
@@ -1728,6 +1858,7 @@ function ProfileDrawer({
   const [deletePwInput, setDeletePwInput] = useState("");
   const [deletePwError, setDeletePwError] = useState("");
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [exportSheetOpen, setExportSheetOpen] = useState(false);
 
   useEffect(() => {
     if (!open) setPage(null);
@@ -1987,10 +2118,10 @@ function ProfileDrawer({
               <>
                 <button
                   type="button"
-                  onClick={onExportBackup}
+                  onClick={() => setExportSheetOpen(true)}
                   className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg field text-[var(--text-secondary)] text-xs font-medium hover:text-[var(--text-primary)] transition-colors"
                 >
-                  <Download size={14} /> Zaxira nusxa olish (JSON)
+                  <Download size={14} /> Ma'lumotlarni yuklab olish
                 </button>
                 <p className="text-[var(--text-faint)] text-[11px] mt-1.5 mb-5 leading-snug">
                   Barcha ishchilar, davomat, avanslar va hisob-kitoblar bitta faylga saqlanadi.
@@ -2043,6 +2174,13 @@ function ProfileDrawer({
           </div>
         )}
       </div>
+      {isAdmin && onExportBackup && (
+        <DataExportSheet
+          open={exportSheetOpen}
+          onClose={() => setExportSheetOpen(false)}
+          onExport={onExportBackup}
+        />
+      )}
     </>
   );
 }
@@ -3445,6 +3583,9 @@ function WorkforceAppInner() {
     }
   });
   const [loginError, setLoginError] = useState("");
+  const [loginErrorTick, setLoginErrorTick] = useState(0);
+  const [lockSeconds, setLockSeconds] = useState(0);
+  const [lockTick, setLockTick] = useState(0);
   const [loginBusy, setLoginBusy] = useState(false);
 
   const [adminTab, setAdminTab] = useState("employees");
@@ -3627,17 +3768,13 @@ function WorkforceAppInner() {
   // LOGIN / RO'YXATDAN O'TISH
   // ============================================================================
 
-  function formatLockMessage(secondsLeft) {
-    const mins = Math.ceil(secondsLeft / 60);
-    return `Juda ko'p noto'g'ri urinish. ${mins} daqiqadan keyin qayta urining.`;
-  }
-
   async function handleLogin() {
     setLoginError("");
     const username = loginForm.username.trim();
     const password = loginForm.password;
     if (!username || !password) {
       setLoginError(makeT(lang)("wrongLogin"));
+      setLoginErrorTick((t) => t + 1);
       return;
     }
     setLoginBusy(true);
@@ -3646,7 +3783,8 @@ function WorkforceAppInner() {
       const { data: lockData } = await supabase.rpc("check_login_lock", { p_username: username });
       const lock = Array.isArray(lockData) ? lockData[0] : lockData;
       if (lock && lock.locked) {
-        setLoginError(formatLockMessage(lock.seconds_left));
+        setLockSeconds(lock.seconds_left);
+        setLockTick((x) => x + 1);
         setLoginBusy(false);
         return;
       }
@@ -3654,7 +3792,8 @@ function WorkforceAppInner() {
       if (lookupErr || !email) {
         const { data: failData } = await supabase.rpc("record_login_failure", { p_username: username });
         const fail = Array.isArray(failData) ? failData[0] : failData;
-        setLoginError(fail && fail.locked ? formatLockMessage(fail.seconds_left) : makeT(lang)("wrongLogin"));
+        if (fail && fail.locked) { setLockSeconds(fail.seconds_left); setLockTick((x) => x + 1); }
+        else { setLoginError(makeT(lang)("wrongLogin")); setLoginErrorTick((t) => t + 1); }
         setLoginBusy(false);
         return;
       }
@@ -3662,7 +3801,8 @@ function WorkforceAppInner() {
       if (signInErr || !signInData?.session) {
         const { data: failData } = await supabase.rpc("record_login_failure", { p_username: username });
         const fail = Array.isArray(failData) ? failData[0] : failData;
-        setLoginError(fail && fail.locked ? formatLockMessage(fail.seconds_left) : makeT(lang)("wrongLogin"));
+        if (fail && fail.locked) { setLockSeconds(fail.seconds_left); setLockTick((x) => x + 1); }
+        else { setLoginError(makeT(lang)("wrongLogin")); setLoginErrorTick((t) => t + 1); }
         setLoginBusy(false);
         return;
       }
@@ -4116,6 +4256,9 @@ function WorkforceAppInner() {
         onRegister={registerAdmin}
         rememberMe={rememberMe}
         setRememberMe={setRememberMe}
+        lockSeconds={lockSeconds}
+        lockTick={lockTick}
+        loginErrorTick={loginErrorTick}
       />
     );
   } else if (currentUser.role === "admin") {
@@ -4235,6 +4378,15 @@ function WorkforceAppInner() {
             from { transform: translateY(100%); }
             to { transform: translateY(0); }
           }
+
+          /* YANGI: login xato bo'lganda input maydoni titraydi (vibratsiyaga o'xshab). */
+          @keyframes shake {
+            10%, 90% { transform: translateX(-1px); }
+            20%, 80% { transform: translateX(2px); }
+            30%, 50%, 70% { transform: translateX(-4px); }
+            40%, 60% { transform: translateX(4px); }
+          }
+          .shake-anim { animation: shake 0.4s ease; }
 
           /* YANGI: tekis (flat), zamonaviy uslub. Har bir "kartochka" nozik
              border va bitta yumshoq soya bilan ajralib turadi — ikki tomonlama
