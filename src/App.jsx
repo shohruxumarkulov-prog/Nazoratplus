@@ -3202,7 +3202,26 @@ function EmployeeApp({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const unreadCount = notifications.filter((n) => !n.is_read).length;
-  const [empTab, setEmpTab] = useState("umumiy");
+  const [empTab, setEmpTabRaw] = useState("umumiy");
+
+  // YANGI: admin panelidagidek — tab almashtirish brauzer tarixiga yoziladi,
+  // shuning uchun "orqaga" tugmasi ilovadan chiqarib yubormay, avvalgi bo'limga qaytaradi.
+  function setEmpTab(tab) {
+    if (tab === empTab) return;
+    window.history.pushState({ kind: "empTab", tab }, "");
+    setEmpTabRaw(tab);
+  }
+  useEffect(() => {
+    window.history.replaceState({ kind: "empTab", tab: empTab }, "");
+    function onPopState(e) {
+      if (e.state && e.state.kind === "empTab") {
+        setEmpTabRaw(e.state.tab);
+      }
+    }
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [attMonthOffset, setAttMonthOffset] = useState(0);
   const [advMonthKey, setAdvMonthKey] = useState(todayISO().slice(0, 7));
   const advScrollRef = useRef(null);
@@ -3581,7 +3600,29 @@ function WorkforceAppInner() {
   const [lockTick, setLockTick] = useState(0);
   const [loginBusy, setLoginBusy] = useState(false);
 
-  const [adminTab, setAdminTab] = useState("employees");
+  const [adminTab, setAdminTabRaw] = useState("employees");
+  const historyInitRef = useRef(false);
+
+  // YANGI: tab almashtirish endi brauzer tarixiga ("orqaga" tugmasi uchun) yoziladi.
+  // Shu sabab Ishchilar → Davomat → Avanslar → Hisobot tartibida o'tilgandan keyin
+  // "orqaga" bosilsa, ilovadan chiqib ketish o'rniga avvalgi bo'limga qaytadi.
+  function setAdminTab(tab) {
+    if (tab === adminTab) return;
+    window.history.pushState({ kind: "adminTab", tab }, "");
+    setAdminTabRaw(tab);
+  }
+
+  useEffect(() => {
+    function onPopState(e) {
+      if (e.state && e.state.kind === "adminTab") {
+        setAdminTabRaw(e.state.tab);
+      } else if (e.state && e.state.kind === "empTab") {
+        // ishchi panelidagi tab holati EmployeeApp o'zi eshitadi — bu yerda hech narsa qilmaymiz
+      }
+    }
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
   const [newEmp, setNewEmp] = useState({ name: "", username: "", password: "", dailyWage: "" });
   const [empError, setEmpError] = useState("");
   const [attDate, setAttDate] = useState(todayISO());
@@ -3659,6 +3700,10 @@ function WorkforceAppInner() {
       setAdvances(advMap);
       setSettlements(setMap);
       setCurrentUserState({ role: "admin", name: makeT(lang)("admin"), username: myProfile.username, id: myProfile.id });
+      if (!historyInitRef.current) {
+        window.history.replaceState({ kind: "adminTab", tab: adminTab }, "");
+        historyInitRef.current = true;
+      }
       await loadNotifications(myProfile.id);
     } else {
       // Ishchi: o'z ma'lumotlarini va admin (owner)ining avatarini olamiz
@@ -3845,6 +3890,8 @@ function WorkforceAppInner() {
     setUsersData(null);
     setSession(null);
     setLoginForm({ username: "", password: "" });
+    setAdminTabRaw("employees");
+    historyInitRef.current = false;
   }
 
   // ============================================================================
